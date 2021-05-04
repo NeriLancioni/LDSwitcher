@@ -1,19 +1,20 @@
 @echo off
 
-REM Si se esta ejecutando desde tarea programada, cambiar modo sin UI
+REM If script is being run by a scheduled task, go to No-UI mode
 if "%1"=="task" goto :SWITCHER
 
-REM Detectar idioma
+REM Detect language
 call :findLang es-
 if "%errorlevel%"=="0" (
     call :setLangEs
     goto :langSelected
 )
 
+REM Default to English
 call :setLangEn
 :langSelected
 
-REM Comprobar version de Windows
+REM Check Windows version
 wmic os get Caption /value | find "Windows 10" >nul 2>&1
 if %errorlevel% neq 0 (
     call :clearDualEcho
@@ -25,9 +26,9 @@ if %errorlevel% neq 0 (
 	exit /b 1
 )
 
-REM Comprobar permisos de administrador
+REM Check for admin privileges
 mkdir %windir%\checkYourPrivileges >nul 2>&1
-if %errorlevel%==0 (
+if "%errorlevel%"=="0" (
 	rmdir /s /q %windir%\checkYourPrivileges
 ) else (
     call :clearDualEcho
@@ -41,12 +42,11 @@ if %errorlevel%==0 (
 )
 
 call :cmdColor
-
-REM Definir si LDSwitcher esta instalado
-REM Si no esta instalado, continuar con el instalador
+REM Check install status
+REM If not installed, go to installer
 if not exist "%systemdrive%\LDSwitcher\" goto :install
 
-REM Si esta instalado, preguntar si se quiere modificar, desinstalar o cancelar
+REM If installed, ask if user wants to modify, uninstall or cancel
 call :clearDualEcho
 echo %strAlreadyInstalled%
 choice /c %strWhatToDoOptions% /n /m %strWhatToDo%
@@ -56,15 +56,15 @@ if "%errorlevel%"=="3" exit /b
 exit /b
 
 :install
-REM Definir horario de inicio de modo claro (formato 24hs)
+REM Define light mode start time (24hs format)
 call :timeInput %strLightStart%
 set lightStart=%timeAcu%
 
-REM Definir horario de inicio de modo oscuro (formato 24hs)
+REM Define dark mode start time (24hs format)
 call :timeInput %strDarkStart%
 set darkStart=%timeAcu%
 
-REM Definir comportamiento de barra de tareas
+REM Define task bar behaviour
 call :clearDualEcho
 echo %strTaskBarModeMsg%
 echo %strTaskBarOptLight%
@@ -78,7 +78,7 @@ set /a barMode=%errorlevel%-1
 call :clearDualEcho
 echo %strInstalling%
 
-REM Separar horarios en variables separadas
+REM Split both times to separate variables
 if "%lightStart:~0,1%"=="0" (
     set /a light_HH=%lightStart:~1,1%
 ) else (
@@ -101,7 +101,7 @@ if "%darkStart:~3,1%"=="0" (
     set /a dark_mm=%darkStart:~3,2%
 )
 
-REM Comprobar que el horario de inicio sea anterior al horario de fin
+REM Check if light mode starts before dark mode
 set /a lightStartMin=%light_HH% * 60 + %light_mm%
 set /a darkStartMin=%dark_HH% * 60 + %dark_mm%
 if %darkStartMin% leq %lightStartMin% (
@@ -112,11 +112,11 @@ if %darkStartMin% leq %lightStartMin% (
     goto :install
 )
 
-REM Copiar archivos necesarios a ubicacion separada
+REM Copy required files to separate folder
 mkdir "%systemdrive%\LDSwitcher" >nul 2>&1
 copy /y %0 %systemdrive%\LDSwitcher\LDSwitcher.bat >nul 2>&1
 
-REM Crear config.txt
+REM Create config.txt
 echo lightTime_HH=%light_HH% > %systemdrive%\LDSwitcher\config.txt
 echo lightTime_mm=%light_mm% >> %systemdrive%\LDSwitcher\config.txt
 echo darkTime_HH=%dark_HH% >> %systemdrive%\LDSwitcher\config.txt
@@ -125,12 +125,12 @@ echo taskBarMode=%barMode% >> %systemdrive%\LDSwitcher\config.txt
 
 call :createScheduledTasks %lightStart% %darkStart% >nul 2>&1
 
-REM Ejecutar script de cambio de tema sin argumentos
+REM Run theme changer script with (almost) no arguments
 call %systemdrive%\LDSwitcher\LDSwitcher.bat task >nul 2>&1
 
 call :cmdColor
 
-REM Salir
+REM Success message and exit
 call :clearDualEcho
 echo %strInstallSuccess%
 echo.
@@ -381,19 +381,19 @@ echo ^</Task^> >> %targetPath%
 exit /b
 
 :SWITCHER
-REM Comprobar que exista archivo de configuracion
+REM Check configuration file existence
 if not exist %~dp0config.txt exit /b 2
-REM Cargar configuraciones
+REM Load parameters from config file
 for /f "tokens=1,2 delims==" %%a in (%~dp0config.txt) do (
     set /a %%a=%%b
 )
 if not defined taskBarMode exit /b 7
 
-REM Si se llama con argumento, cambiar segun el argumento y salir
+REM If called with an argument, change according to it and return
 if "%2"=="L" call :setMode 1 & exit /b 0
 if "%2"=="D" call :setMode 0 & exit /b 0
 
-REM Comprobar que se hayan definido las variables necesarias para funcionar
+REM Check if needed variables are defined
 if not defined lightTime_HH exit /b 3
 if not defined lightTime_mm exit /b 4
 if not defined darkTime_HH exit /b 5
@@ -401,12 +401,12 @@ if not defined darkTime_mm exit /b 6
 
 if %errorlevel% neq 0 exit /b %errorlevel%
 
-REM Si se usa un argumento invalido, salir
+REM If using an invalid argument, exit
 set arg=%2
 if defined arg exit /b 1
 
-REM Definir horas y minutos de tiempo actual en variables numericas separadas
-REM Ignora formato regional, usa el formato de 24hs
+REM Set current hours and minutes on separate numeric variables
+REM Ignores regional format, uses 24hr format
 for /f "tokens=1,2 delims=:" %%a in ('echo %time%') do (
     set /a now_HH=%%a
     set now_mm=%%b
@@ -417,8 +417,8 @@ if "%now_mm:~0,1%"=="0" (
     set /a now_mm=%now_mm%
 )
 
-REM Establecer modo claro si la hora actual esta entre el inicio del modo claro y el inicio del modo oscuro
-REM Sino establecer modo oscuro
+REM Set light mode if current time is between light and dark mode start times
+REM If not, set dark mode
 set /a lightTime=%lightTime_HH% * 60 + %lightTime_mm%
 set /a darkTime=%darkTime_HH% * 60 + %darkTime_mm%
 set /a now=%now_HH% * 60 + %now_mm%
@@ -491,8 +491,9 @@ set timeAcu=%timeAcu%%indexOffset%
 set indexOffset=
 exit /b
 
+REM Trying to save some lines xd
 :clearDualEcho
-cls & echo. & echo. & rem Trying to save some lines xd
+cls & echo. & echo.
 exit /b
 
 :cmdColor
