@@ -44,7 +44,7 @@ if "%errorlevel%"=="0" (
 call :cmdColor
 REM Check install status
 REM If not installed, go to installer
-if not exist "%systemdrive%\LDSwitcher\" goto :install
+if not exist "%localappdata%\LDSwitcher\" goto :install
 
 REM If installed, ask if user wants to modify, uninstall or cancel
 call :clearDualEcho
@@ -113,20 +113,20 @@ if %darkStartMin% leq %lightStartMin% (
 )
 
 REM Copy required files to separate folder
-mkdir "%systemdrive%\LDSwitcher" >nul 2>&1
-copy /y %0 %systemdrive%\LDSwitcher\LDSwitcher.bat >nul 2>&1
+mkdir "%localappdata%\LDSwitcher" >nul 2>&1
+copy /y %0 "%localappdata%\LDSwitcher\LDSwitcher.bat" >nul 2>&1
 
 REM Create config.txt
-echo lightTime_HH=%light_HH% > %systemdrive%\LDSwitcher\config.txt
-echo lightTime_mm=%light_mm% >> %systemdrive%\LDSwitcher\config.txt
-echo darkTime_HH=%dark_HH% >> %systemdrive%\LDSwitcher\config.txt
-echo darkTime_mm=%dark_mm% >> %systemdrive%\LDSwitcher\config.txt
-echo taskBarMode=%barMode% >> %systemdrive%\LDSwitcher\config.txt
+echo lightTime_HH=%light_HH% > "%localappdata%\LDSwitcher\config.txt"
+echo lightTime_mm=%light_mm% >> "%localappdata%\LDSwitcher\config.txt"
+echo darkTime_HH=%dark_HH% >> "%localappdata%\LDSwitcher\config.txt"
+echo darkTime_mm=%dark_mm% >> "%localappdata%\LDSwitcher\config.txt"
+echo taskBarMode=%barMode% >> "%localappdata%\LDSwitcher\config.txt"
 
 call :createScheduledTasks %lightStart% %darkStart% >nul 2>&1
 
 REM Run theme changer script with (almost) no arguments
-call %systemdrive%\LDSwitcher\LDSwitcher.bat task >nul 2>&1
+call "%localappdata%\LDSwitcher\LDSwitcher.bat" task >nul 2>&1
 
 call :cmdColor
 
@@ -221,7 +221,7 @@ echo     ^<Priority^>7^</Priority^> >> %targetPath%
 echo   ^</Settings^> >> %targetPath%
 echo   ^<Actions Context="Author"^> >> %targetPath%
 echo     ^<Exec^> >> %targetPath%
-echo       ^<Command^>%systemdrive%\LDSwitcher\LDSwitcher.bat^</Command^> >> %targetPath%
+echo       ^<Command^>"%localappdata%\LDSwitcher\LDSwitcher.bat"^</Command^> >> %targetPath%
 echo       ^<Arguments^>task %3^</Arguments^> >> %targetPath%
 echo     ^</Exec^> >> %targetPath%
 echo   ^</Actions^> >> %targetPath%
@@ -272,7 +272,7 @@ echo     ^<Priority^>7^</Priority^> >> %targetPath%
 echo   ^</Settings^> >> %targetPath%
 echo   ^<Actions Context="Author"^> >> %targetPath%
 echo     ^<Exec^> >> %targetPath%
-echo       ^<Command^>%systemdrive%\LDSwitcher\LDSwitcher.bat^</Command^> >> %targetPath%
+echo       ^<Command^>"%localappdata%\LDSwitcher\LDSwitcher.bat"^</Command^> >> %targetPath%
 echo       ^<Arguments^>task^</Arguments^> >> %targetPath%
 echo     ^</Exec^> >> %targetPath%
 echo   ^</Actions^> >> %targetPath%
@@ -322,7 +322,7 @@ echo     ^<Priority^>7^</Priority^> >> %targetPath%
 echo   ^</Settings^> >> %targetPath%
 echo   ^<Actions Context="Author"^> >> %targetPath%
 echo     ^<Exec^> >> %targetPath%
-echo       ^<Command^>%systemdrive%\LDSwitcher\LDSwitcher.bat^</Command^> >> %targetPath%
+echo       ^<Command^>"%localappdata%\LDSwitcher\LDSwitcher.bat"^</Command^> >> %targetPath%
 echo       ^<Arguments^>task^</Arguments^> >> %targetPath%
 echo     ^</Exec^> >> %targetPath%
 echo   ^</Actions^> >> %targetPath%
@@ -373,7 +373,7 @@ echo     ^<Priority^>7^</Priority^> >> %targetPath%
 echo   ^</Settings^> >> %targetPath%
 echo   ^<Actions Context="Author"^> >> %targetPath%
 echo     ^<Exec^> >> %targetPath%
-echo       ^<Command^>%systemdrive%\LDSwitcher\LDSwitcher.bat^</Command^> >> %targetPath%
+echo       ^<Command^>"%localappdata%\LDSwitcher\LDSwitcher.bat"^</Command^> >> %targetPath%
 echo       ^<Arguments^>task^</Arguments^> >> %targetPath%
 echo     ^</Exec^> >> %targetPath%
 echo   ^</Actions^> >> %targetPath%
@@ -453,7 +453,7 @@ if "%errorlevel%" neq "1" (
 )
 call :clearDualEcho
 echo %strUninstalling%
-rmdir /s /q %systemdrive%\LDSwitcher\ >nul 2>&1
+rmdir /s /q "%localappdata%\LDSwitcher\" >nul 2>&1
 for /f "skip=1 tokens=1 delims=," %%i in ('schtasks /query /tn \LDSwitcher\ /fo csv') do (
     schtasks /delete /tn %%i /f >nul 2>&1
 )
