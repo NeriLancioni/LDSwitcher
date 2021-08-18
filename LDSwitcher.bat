@@ -205,6 +205,7 @@ set /a darkTime=!darkTime_HH! * 60 + !darkTime_mm!
 
 set lastModeSet=-1
 :loop
+    if not exist "!_localappdata!\LDSwitcher\config.txt" exit
     if "!lastModeSet!" neq "-1" choice /t 5 /c ab /d a > nul
 
     REM Set current hours and minutes on separate numeric variables
