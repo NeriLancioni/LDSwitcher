@@ -1,11 +1,12 @@
 @echo off
+setlocal enabledelayedexpansion
 
-REM If script is being run by a scheduled task, go to No-UI mode
+REM If script is being run by a scheduled task, go to background task
 if "%1"=="task" goto :SWITCHER
 
 REM Detect language
 call :findLang es-
-if "%errorlevel%"=="0" (
+if "!errorlevel!"=="0" (
     call :setLangEs
     goto :langSelected
 )
@@ -14,29 +15,43 @@ REM Default to English
 call :setLangEn
 :langSelected
 
+call :clearDualEcho
+echo !strInit!
+
+call :findVars
+if "!errorlevel!"=="1" (
+    call :clearDualEcho
+    echo !strEnvVarError!
+    echo.
+    echo !strExit!
+    pause > nul
+    exit /b
+)
+
+
 REM Check Windows version
 wmic os get Caption /value | find "Windows 10" >nul 2>&1
-if %errorlevel% neq 0 (
+if !errorlevel! neq 0 (
     call :clearDualEcho
-    echo %strNotTen1%
-    echo %strNotTen2%
+    echo !strNotTen1!
+    echo !strNotTen2!
     echo.
-	echo %strExit%
+	echo !strExit!
 	pause > nul
 	exit /b 1
 )
 
 REM Check for admin privileges
 mkdir %windir%\checkYourPrivileges >nul 2>&1
-if "%errorlevel%"=="0" (
+if "!errorlevel!"=="0" (
 	rmdir /s /q %windir%\checkYourPrivileges
 ) else (
     call :clearDualEcho
-    echo %strUAC1%
-	echo %strUAC2%
-	echo %strUAC3%
+    echo !strUAC1!
+	echo !strUAC2!
+	echo !strUAC3!
 	echo.
-	echo %strExit%
+	echo !strExit!
 	pause > nul
 	exit /b 2
 )
@@ -44,101 +59,115 @@ if "%errorlevel%"=="0" (
 call :cmdColor
 REM Check install status
 REM If not installed, go to installer
-if not exist "%localappdata%\LDSwitcher\" goto :install
+if not exist "!_localappdata!\LDSwitcher\" goto :install
 
 REM If installed, ask if user wants to modify, uninstall or cancel
 call :clearDualEcho
-echo %strAlreadyInstalled%
-choice /c %strWhatToDoOptions% /n /m %strWhatToDo%
-if "%errorlevel%"=="1" goto :install
-if "%errorlevel%"=="2" goto :uninstall
-if "%errorlevel%"=="3" exit /b
+echo !strAlreadyInstalled!
+choice /c !strWhatToDoOptions! /n /m !strWhatToDo!
+if "!errorlevel!"=="1" goto :install
+if "!errorlevel!"=="2" goto :uninstall
+if "!errorlevel!"=="3" exit /b
 exit /b
 
 :install
 REM Define light mode start time (24hs format)
-call :timeInput %strLightStart%
-set lightStart=%timeAcu%
+call :timeInput !strLightStart!
+set lightStart=!timeAcu!
 
 REM Define dark mode start time (24hs format)
-call :timeInput %strDarkStart%
-set darkStart=%timeAcu%
+call :timeInput !strDarkStart!
+set darkStart=!timeAcu!
 
 REM Define task bar behaviour
 call :clearDualEcho
-echo %strTaskBarModeMsg%
-echo %strTaskBarOptLight%
-echo %strTaskBarOptDark%
-echo %strTaskBarOptByTime%
+echo !strTaskBarModeMsg!
+echo !strTaskBarOptLight!
+echo !strTaskBarOptDark!
+echo !strTaskBarOptByTime!
 echo.
-choice /c %strTaskBarOptions% /n
-set /a barMode=%errorlevel%-1
+choice /c !strTaskBarOptions! /n
+set /a barMode=!errorlevel!-1
 
 
 call :clearDualEcho
-echo %strInstalling%
+echo !strInstalling!
 
 REM Split both times to separate variables
-if "%lightStart:~0,1%"=="0" (
-    set /a light_HH=%lightStart:~1,1%
+if "!lightStart:~0,1!"=="0" (
+    set /a light_HH=!lightStart:~1,1!
 ) else (
-    set /a light_HH=%lightStart:~0,2%
+    set /a light_HH=!lightStart:~0,2!
 )
-if "%lightStart:~3,1%"=="0" (
-    set /a light_mm=%lightStart:~4,1%
+if "!lightStart:~3,1!"=="0" (
+    set /a light_mm=!lightStart:~4,1!
 ) else (
-    set /a light_mm=%lightStart:~3,2%
+    set /a light_mm=!lightStart:~3,2!
 )
 
-if "%darkStart:~0,1%"=="0" (
-    set /a dark_HH=%darkStart:~1,1%
+if "!darkStart:~0,1!"=="0" (
+    set /a dark_HH=!darkStart:~1,1!
 ) else (
-    set /a dark_HH=%darkStart:~0,2%
+    set /a dark_HH=!darkStart:~0,2!
 )
-if "%darkStart:~3,1%"=="0" (
-    set /a dark_mm=%darkStart:~4,1%
+if "!darkStart:~3,1!"=="0" (
+    set /a dark_mm=!darkStart:~4,1!
 ) else (
-    set /a dark_mm=%darkStart:~3,2%
+    set /a dark_mm=!darkStart:~3,2!
 )
 
 REM Check if light mode starts before dark mode
-set /a lightStartMin=%light_HH% * 60 + %light_mm%
-set /a darkStartMin=%dark_HH% * 60 + %dark_mm%
-if %darkStartMin% leq %lightStartMin% (
+set /a lightStartMin=!light_HH! * 60 + !light_mm!
+set /a darkStartMin=!dark_HH! * 60 + !dark_mm!
+if !darkStartMin! leq !lightStartMin! (
     call :clearDualEcho
-    echo %strLDWrongOrder%
+    echo !strLDWrongOrder!
     echo.
     pause
     goto :install
 )
 
 REM Copy required files to separate folder
-mkdir "%localappdata%\LDSwitcher" >nul 2>&1
-copy /y %0 "%localappdata%\LDSwitcher\LDSwitcher.bat" >nul 2>&1
+mkdir "!_localappdata!\LDSwitcher" >nul 2>&1
+mkdir "%systemdrive%\LDSwitcher" >nul 2>&1
+attrib +s +h "%systemdrive%\LDSwitcher" >nul 2>&1
+copy /y %0 "%systemdrive%\LDSwitcher\LDSwitcher.bat" >nul 2>&1
+
+REM Create startup script
+echo Set WshShell = WScript.CreateObject("WScript.Shell") > "!_appdata!\Microsoft\Windows\Start Menu\Programs\Startup\LDSwitcher.vbs"
+echo WshShell.Run "schtasks /run /tn ""\LDSwitcherElevation !_username!"" /i", 0, False >> "!_appdata!\Microsoft\Windows\Start Menu\Programs\Startup\LDSwitcher.vbs"
+
+REM Create elevation scheduled task
+schtasks /create /ru "!_username!" /sc ONCE /sd 01/01/1970 /st 00:00 /tn "\LDSwitcherElevation !_username!" /tr "%systemdrive%\LDSwitcher\SilentLDSwitcher.vbs" /rl highest /f >nul 2>&1
+
+REM Create silent start script
+echo Set WshShell = WScript.CreateObject("WScript.Shell") > "%systemdrive%\LDSwitcher\SilentLDSwitcher.vbs"
+echo WshShell.Run "%systemdrive%\LDSwitcher\LDSwitcher.bat task", 0, False >> "%systemdrive%\LDSwitcher\SilentLDSwitcher.vbs"
+
+
 
 REM Create config.txt
-echo lightTime_HH=%light_HH% > "%localappdata%\LDSwitcher\config.txt"
-echo lightTime_mm=%light_mm% >> "%localappdata%\LDSwitcher\config.txt"
-echo darkTime_HH=%dark_HH% >> "%localappdata%\LDSwitcher\config.txt"
-echo darkTime_mm=%dark_mm% >> "%localappdata%\LDSwitcher\config.txt"
-echo taskBarMode=%barMode% >> "%localappdata%\LDSwitcher\config.txt"
+echo lightTime_HH=!light_HH! > "!_localappdata!\LDSwitcher\config.txt"
+echo lightTime_mm=!light_mm! >> "!_localappdata!\LDSwitcher\config.txt"
+echo darkTime_HH=!dark_HH! >> "!_localappdata!\LDSwitcher\config.txt"
+echo darkTime_mm=!dark_mm! >> "!_localappdata!\LDSwitcher\config.txt"
+echo taskBarMode=!barMode! >> "!_localappdata!\LDSwitcher\config.txt"
 
-call :createScheduledTasks %lightStart% %darkStart% >nul 2>&1
+REM Run theme changer from startup vbs script
+schtasks /run /tn "\LDSwitcherElevation !_username!" /i >nul 2>&1
 
-REM Run theme changer script with (almost) no arguments
-call "%localappdata%\LDSwitcher\LDSwitcher.bat" task >nul 2>&1
-
+timeout /t 5 /nobreak > nul
 call :cmdColor
 
 REM Success message and exit
 call :clearDualEcho
-echo %strInstallSuccess%
+echo !strInstallSuccess!
 echo.
-echo %strLightStartAt% %lightStart%
-echo %strDarkStartAt% %darkStart%
-if %barMode%==0 ( echo %strBarIsDark% )
-if %barMode%==1 ( echo %strBarIsLight% )
-if %barMode%==2 ( echo %strBarIsAuto% )
+echo !strLightStartAt! !lightStart!
+echo !strDarkStartAt! !darkStart!
+if !barMode!==0 ( echo !strBarIsDark! )
+if !barMode!==1 ( echo !strBarIsLight! )
+if !barMode!==2 ( echo !strBarIsAuto! )
 echo.
 echo.
 pause
@@ -150,321 +179,95 @@ exit /b
 
 
 
-:createScheduledTasks
-
-set targetPath=%temp%\tempTask.xml
-if not defined SID (
-    for /f "skip=1 tokens=2 delims=," %%i in ('whoami /user /fo CSV') do set SID=%%i
-)
-for /f "skip=1 tokens=1 delims=," %%i in ('schtasks /query /tn \LDSwitcher\ /fo csv') do (
-    schtasks /delete /tn %%i /f >nul 2>&1
-)
-call :TaskByTime lightModeStart %1 L
-schtasks /create /xml "%targetPath%" /tn "\LDSwitcher\lightModeStart" >nul 2>&1
-del /f /q %targetPath% >nul 2>&1
-call :TaskByTime darkModeStart %2 D
-schtasks /create /xml "%targetPath%" /tn "\LDSwitcher\darkModeStart" >nul 2>&1
-del /f /q %targetPath% >nul 2>&1
-call :OnResumeTask
-schtasks /create /xml "%targetPath%" /tn "\LDSwitcher\updateModeOnResume" >nul 2>&1
-del /f /q %targetPath% >nul 2>&1
-call :OnStartTask
-schtasks /create /xml "%targetPath%" /tn "\LDSwitcher\updateModeOnStart" >nul 2>&1
-del /f /q %targetPath% >nul 2>&1
-call :ClockUpdatedTask
-schtasks /create /xml "%targetPath%" /tn "\LDSwitcher\updateModeClockChange" >nul 2>&1
-del /f /q %targetPath% >nul 2>&1
-exit /b
-
-:TaskByTime
-echo ^<?xml version="1.0" encoding="UTF-16"?^> > %targetPath%
-echo ^<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task"^> >> %targetPath%
-echo   ^<RegistrationInfo^> >> %targetPath%
-echo     ^<Date^>2020-06-22T09:32:59^</Date^> >> %targetPath%
-echo     ^<Author^>%computername%\%username%^</Author^> >> %targetPath%
-echo     ^<URI^>\LDSwitcher\%1^</URI^> >> %targetPath%
-echo   ^</RegistrationInfo^> >> %targetPath%
-echo   ^<Triggers^> >> %targetPath%
-echo     ^<CalendarTrigger^> >> %targetPath%
-echo       ^<StartBoundary^>2020-06-22T%2:00^</StartBoundary^> >> %targetPath%
-echo       ^<Enabled^>true^</Enabled^> >> %targetPath%
-echo       ^<ScheduleByDay^> >> %targetPath%
-echo         ^<DaysInterval^>1^</DaysInterval^> >> %targetPath%
-echo       ^</ScheduleByDay^> >> %targetPath%
-echo     ^</CalendarTrigger^> >> %targetPath%
-echo   ^</Triggers^> >> %targetPath%
-echo   ^<Principals^> >> %targetPath%
-echo     ^<Principal id="Author"^> >> %targetPath%
-echo       ^<UserId^>%SID:~1,-1%^</UserId^> >> %targetPath%
-echo       ^<LogonType^>S4U^</LogonType^> >> %targetPath%
-echo       ^<RunLevel^>HighestAvailable^</RunLevel^> >> %targetPath%
-echo     ^</Principal^> >> %targetPath%
-echo   ^</Principals^> >> %targetPath%
-echo   ^<Settings^> >> %targetPath%
-echo     ^<MultipleInstancesPolicy^>IgnoreNew^</MultipleInstancesPolicy^> >> %targetPath%
-echo     ^<DisallowStartIfOnBatteries^>false^</DisallowStartIfOnBatteries^> >> %targetPath%
-echo     ^<StopIfGoingOnBatteries^>false^</StopIfGoingOnBatteries^> >> %targetPath%
-echo     ^<AllowHardTerminate^>true^</AllowHardTerminate^> >> %targetPath%
-echo     ^<StartWhenAvailable^>false^</StartWhenAvailable^> >> %targetPath%
-echo     ^<RunOnlyIfNetworkAvailable^>false^</RunOnlyIfNetworkAvailable^> >> %targetPath%
-echo     ^<IdleSettings^> >> %targetPath%
-echo       ^<StopOnIdleEnd^>true^</StopOnIdleEnd^> >> %targetPath%
-echo       ^<RestartOnIdle^>false^</RestartOnIdle^> >> %targetPath%
-echo     ^</IdleSettings^> >> %targetPath%
-echo     ^<AllowStartOnDemand^>true^</AllowStartOnDemand^> >> %targetPath%
-echo     ^<Enabled^>true^</Enabled^> >> %targetPath%
-echo     ^<Hidden^>false^</Hidden^> >> %targetPath%
-echo     ^<RunOnlyIfIdle^>false^</RunOnlyIfIdle^> >> %targetPath%
-echo     ^<WakeToRun^>false^</WakeToRun^> >> %targetPath%
-echo     ^<ExecutionTimeLimit^>PT72H^</ExecutionTimeLimit^> >> %targetPath%
-echo     ^<Priority^>7^</Priority^> >> %targetPath%
-echo   ^</Settings^> >> %targetPath%
-echo   ^<Actions Context="Author"^> >> %targetPath%
-echo     ^<Exec^> >> %targetPath%
-echo       ^<Command^>"%localappdata%\LDSwitcher\LDSwitcher.bat"^</Command^> >> %targetPath%
-echo       ^<Arguments^>task %3^</Arguments^> >> %targetPath%
-echo     ^</Exec^> >> %targetPath%
-echo   ^</Actions^> >> %targetPath%
-echo ^</Task^> >> %targetPath%
-exit /b
-
-:OnResumeTask
-echo ^<?xml version="1.0" encoding="UTF-16"?^> > %targetPath%
-echo ^<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task"^> >> %targetPath%
-echo   ^<RegistrationInfo^> >> %targetPath%
-echo     ^<Date^>2020-06-22T09:32:59^</Date^> >> %targetPath%
-echo     ^<Author^>%computername%\%username%^</Author^> >> %targetPath%
-echo     ^<URI^>\LDSwitcher\updateModeOnResume^</URI^> >> %targetPath%
-echo   ^</RegistrationInfo^> >> %targetPath%
-echo   ^<Triggers^> >> %targetPath%
-echo     ^<EventTrigger^> >> %targetPath%
-echo       ^<Enabled^>true^</Enabled^> >> %targetPath%
-echo       ^<Subscription^>^&lt;QueryList^&gt;^&lt;Query Id="0" Path="System"^&gt;^&lt;Select Path="System"^&gt;*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1]]^&lt;/Select^&gt;^&lt;/Query^&gt;^&lt;/QueryList^&gt;^</Subscription^> >> %targetPath%
-echo     ^</EventTrigger^> >> %targetPath%
-echo   ^</Triggers^> >> %targetPath%
-echo   ^<Principals^> >> %targetPath%
-echo     ^<Principal id="Author"^> >> %targetPath%
-echo       ^<UserId^>%SID:~1,-1%^</UserId^> >> %targetPath%
-echo       ^<LogonType^>S4U^</LogonType^> >> %targetPath%
-echo       ^<RunLevel^>HighestAvailable^</RunLevel^> >> %targetPath%
-echo     ^</Principal^> >> %targetPath%
-echo   ^</Principals^> >> %targetPath%
-echo   ^<Settings^> >> %targetPath%
-echo     ^<MultipleInstancesPolicy^>IgnoreNew^</MultipleInstancesPolicy^> >> %targetPath%
-echo     ^<DisallowStartIfOnBatteries^>false^</DisallowStartIfOnBatteries^> >> %targetPath%
-echo     ^<StopIfGoingOnBatteries^>false^</StopIfGoingOnBatteries^> >> %targetPath%
-echo     ^<AllowHardTerminate^>true^</AllowHardTerminate^> >> %targetPath%
-echo     ^<StartWhenAvailable^>false^</StartWhenAvailable^> >> %targetPath%
-echo     ^<RunOnlyIfNetworkAvailable^>false^</RunOnlyIfNetworkAvailable^> >> %targetPath%
-echo     ^<IdleSettings^> >> %targetPath%
-echo       ^<StopOnIdleEnd^>true^</StopOnIdleEnd^> >> %targetPath%
-echo       ^<RestartOnIdle^>false^</RestartOnIdle^> >> %targetPath%
-echo     ^</IdleSettings^> >> %targetPath%
-echo     ^<AllowStartOnDemand^>true^</AllowStartOnDemand^> >> %targetPath%
-echo     ^<Enabled^>true^</Enabled^> >> %targetPath%
-echo     ^<Hidden^>false^</Hidden^> >> %targetPath%
-echo     ^<RunOnlyIfIdle^>false^</RunOnlyIfIdle^> >> %targetPath%
-echo     ^<DisallowStartOnRemoteAppSession^>false^</DisallowStartOnRemoteAppSession^> >> %targetPath%
-echo     ^<UseUnifiedSchedulingEngine^>true^</UseUnifiedSchedulingEngine^> >> %targetPath%
-echo     ^<WakeToRun^>false^</WakeToRun^> >> %targetPath%
-echo     ^<ExecutionTimeLimit^>PT72H^</ExecutionTimeLimit^> >> %targetPath%
-echo     ^<Priority^>7^</Priority^> >> %targetPath%
-echo   ^</Settings^> >> %targetPath%
-echo   ^<Actions Context="Author"^> >> %targetPath%
-echo     ^<Exec^> >> %targetPath%
-echo       ^<Command^>"%localappdata%\LDSwitcher\LDSwitcher.bat"^</Command^> >> %targetPath%
-echo       ^<Arguments^>task^</Arguments^> >> %targetPath%
-echo     ^</Exec^> >> %targetPath%
-echo   ^</Actions^> >> %targetPath%
-echo ^</Task^> >> %targetPath%
-exit /b
-
-:OnStartTask
-echo ^<?xml version="1.0" encoding="UTF-16"?^> > %targetPath%
-echo ^<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task"^> >> %targetPath%
-echo   ^<RegistrationInfo^> >> %targetPath%
-echo     ^<Date^>2020-06-22T09:32:59^</Date^> >> %targetPath%
-echo     ^<Author^>%computername%\%username%^</Author^> >> %targetPath%
-echo     ^<URI^>\LDSwitcher\updateModeOnStart^</URI^> >> %targetPath%
-echo   ^</RegistrationInfo^> >> %targetPath%
-echo   ^<Triggers^> >> %targetPath%
-echo     ^<LogonTrigger^> >> %targetPath%
-echo       ^<Enabled^>true^</Enabled^> >> %targetPath%
-echo     ^</LogonTrigger^> >> %targetPath%
-echo   ^</Triggers^> >> %targetPath%
-echo   ^<Principals^> >> %targetPath%
-echo     ^<Principal id="Author"^> >> %targetPath%
-echo       ^<UserId^>%SID:~1,-1%^</UserId^> >> %targetPath%
-echo       ^<LogonType^>S4U^</LogonType^> >> %targetPath%
-echo       ^<RunLevel^>HighestAvailable^</RunLevel^> >> %targetPath%
-echo     ^</Principal^> >> %targetPath%
-echo   ^</Principals^> >> %targetPath%
-echo   ^<Settings^> >> %targetPath%
-echo     ^<MultipleInstancesPolicy^>IgnoreNew^</MultipleInstancesPolicy^> >> %targetPath%
-echo     ^<DisallowStartIfOnBatteries^>false^</DisallowStartIfOnBatteries^> >> %targetPath%
-echo     ^<StopIfGoingOnBatteries^>false^</StopIfGoingOnBatteries^> >> %targetPath%
-echo     ^<AllowHardTerminate^>true^</AllowHardTerminate^> >> %targetPath%
-echo     ^<StartWhenAvailable^>false^</StartWhenAvailable^> >> %targetPath%
-echo     ^<RunOnlyIfNetworkAvailable^>false^</RunOnlyIfNetworkAvailable^> >> %targetPath%
-echo     ^<IdleSettings^> >> %targetPath%
-echo       ^<StopOnIdleEnd^>true^</StopOnIdleEnd^> >> %targetPath%
-echo       ^<RestartOnIdle^>false^</RestartOnIdle^> >> %targetPath%
-echo     ^</IdleSettings^> >> %targetPath%
-echo     ^<AllowStartOnDemand^>true^</AllowStartOnDemand^> >> %targetPath%
-echo     ^<Enabled^>true^</Enabled^> >> %targetPath%
-echo     ^<Hidden^>false^</Hidden^> >> %targetPath%
-echo     ^<RunOnlyIfIdle^>false^</RunOnlyIfIdle^> >> %targetPath%
-echo     ^<DisallowStartOnRemoteAppSession^>false^</DisallowStartOnRemoteAppSession^> >> %targetPath%
-echo     ^<UseUnifiedSchedulingEngine^>true^</UseUnifiedSchedulingEngine^> >> %targetPath%
-echo     ^<WakeToRun^>false^</WakeToRun^> >> %targetPath%
-echo     ^<ExecutionTimeLimit^>PT72H^</ExecutionTimeLimit^> >> %targetPath%
-echo     ^<Priority^>7^</Priority^> >> %targetPath%
-echo   ^</Settings^> >> %targetPath%
-echo   ^<Actions Context="Author"^> >> %targetPath%
-echo     ^<Exec^> >> %targetPath%
-echo       ^<Command^>"%localappdata%\LDSwitcher\LDSwitcher.bat"^</Command^> >> %targetPath%
-echo       ^<Arguments^>task^</Arguments^> >> %targetPath%
-echo     ^</Exec^> >> %targetPath%
-echo   ^</Actions^> >> %targetPath%
-echo ^</Task^> >> %targetPath%
-exit /b
-
-:ClockUpdatedTask
-echo ^<?xml version="1.0" encoding="UTF-16"?^> > %targetPath%
-echo ^<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task"^> >> %targetPath%
-echo   ^<RegistrationInfo^> >> %targetPath%
-echo     ^<Date^>2020-06-22T20:32:54.5449999^</Date^> >> %targetPath%
-echo     ^<Author^>%computername%\%username%^</Author^> >> %targetPath%
-echo     ^<URI^>\LDSwitcher\updateModeClockChange^</URI^> >> %targetPath%
-echo   ^</RegistrationInfo^> >> %targetPath%
-echo   ^<Triggers^> >> %targetPath%
-echo     ^<EventTrigger^> >> %targetPath%
-echo       ^<Enabled^>true^</Enabled^> >> %targetPath%
-echo       ^<Subscription^>^&lt;QueryList^&gt;^&lt;Query Id="0" Path="System"^&gt;^&lt;Select Path="System"^&gt;*[System[Provider[@Name='Microsoft-Windows-Kernel-General'] and EventID=1]]^&lt;/Select^&gt;^&lt;/Query^&gt;^&lt;/QueryList^&gt;^</Subscription^> >> %targetPath%
-echo     ^</EventTrigger^> >> %targetPath%
-echo   ^</Triggers^> >> %targetPath%
-echo   ^<Principals^> >> %targetPath%
-echo     ^<Principal id="Author"^> >> %targetPath%
-echo       ^<UserId^>%SID:~1,-1%^</UserId^> >> %targetPath%
-echo       ^<LogonType^>S4U^</LogonType^> >> %targetPath%
-echo       ^<RunLevel^>HighestAvailable^</RunLevel^> >> %targetPath%
-echo     ^</Principal^> >> %targetPath%
-echo   ^</Principals^> >> %targetPath%
-echo   ^<Settings^> >> %targetPath%
-echo     ^<MultipleInstancesPolicy^>IgnoreNew^</MultipleInstancesPolicy^> >> %targetPath%
-echo     ^<DisallowStartIfOnBatteries^>false^</DisallowStartIfOnBatteries^> >> %targetPath%
-echo     ^<StopIfGoingOnBatteries^>false^</StopIfGoingOnBatteries^> >> %targetPath%
-echo     ^<AllowHardTerminate^>true^</AllowHardTerminate^> >> %targetPath%
-echo     ^<StartWhenAvailable^>false^</StartWhenAvailable^> >> %targetPath%
-echo     ^<RunOnlyIfNetworkAvailable^>false^</RunOnlyIfNetworkAvailable^> >> %targetPath%
-echo     ^<IdleSettings^> >> %targetPath%
-echo       ^<StopOnIdleEnd^>true^</StopOnIdleEnd^> >> %targetPath%
-echo       ^<RestartOnIdle^>false^</RestartOnIdle^> >> %targetPath%
-echo     ^</IdleSettings^> >> %targetPath%
-echo     ^<AllowStartOnDemand^>true^</AllowStartOnDemand^> >> %targetPath%
-echo     ^<Enabled^>true^</Enabled^> >> %targetPath%
-echo     ^<Hidden^>false^</Hidden^> >> %targetPath%
-echo     ^<RunOnlyIfIdle^>false^</RunOnlyIfIdle^> >> %targetPath%
-echo     ^<DisallowStartOnRemoteAppSession^>false^</DisallowStartOnRemoteAppSession^> >> %targetPath%
-echo     ^<UseUnifiedSchedulingEngine^>true^</UseUnifiedSchedulingEngine^> >> %targetPath%
-echo     ^<WakeToRun^>false^</WakeToRun^> >> %targetPath%
-echo     ^<ExecutionTimeLimit^>PT72H^</ExecutionTimeLimit^> >> %targetPath%
-echo     ^<Priority^>7^</Priority^> >> %targetPath%
-echo   ^</Settings^> >> %targetPath%
-echo   ^<Actions Context="Author"^> >> %targetPath%
-echo     ^<Exec^> >> %targetPath%
-echo       ^<Command^>"%localappdata%\LDSwitcher\LDSwitcher.bat"^</Command^> >> %targetPath%
-echo       ^<Arguments^>task^</Arguments^> >> %targetPath%
-echo     ^</Exec^> >> %targetPath%
-echo   ^</Actions^> >> %targetPath%
-echo ^</Task^> >> %targetPath%
-exit /b
-
 :SWITCHER
+call :findVars
+if "%errorlevel%" neq "0" exit
+
 REM Check configuration file existence
-if not exist %~dp0config.txt exit /b 2
+if not exist "!_localappdata!\LDSwitcher\config.txt" exit /b 2
 REM Load parameters from config file
-for /f "tokens=1,2 delims==" %%a in (%~dp0config.txt) do (
+for /f "tokens=1,2 delims==" %%a in ('more "!_localappdata!\LDSwitcher\config.txt"') do (
     set /a %%a=%%b
 )
-if not defined taskBarMode exit /b 7
-
-REM If called with an argument, change according to it and return
-if "%2"=="L" call :setMode 1 & exit /b 0
-if "%2"=="D" call :setMode 0 & exit /b 0
 
 REM Check if needed variables are defined
 if not defined lightTime_HH exit /b 3
 if not defined lightTime_mm exit /b 4
 if not defined darkTime_HH exit /b 5
 if not defined darkTime_mm exit /b 6
+if not defined taskBarMode exit /b 7
 
-if %errorlevel% neq 0 exit /b %errorlevel%
+if !errorlevel! neq 0 exit /b !errorlevel!
 
-REM If using an invalid argument, exit
-set arg=%2
-if defined arg exit /b 1
+rem Set light and dark mode start times in minutes
+set /a lightTime=!lightTime_HH! * 60 + !lightTime_mm!
+set /a darkTime=!darkTime_HH! * 60 + !darkTime_mm!
 
-REM Set current hours and minutes on separate numeric variables
-REM Ignores regional format, uses 24hr format
-for /f "tokens=1,2 delims=:" %%a in ('echo %time%') do (
-    set /a now_HH=%%a
-    set now_mm=%%b
-)
-if "%now_mm:~0,1%"=="0" (
-    set /a now_mm=%now_mm:~1,1%
-) else (
-    set /a now_mm=%now_mm%
-)
+set lastModeSet=-1
+:loop
+    if "!lastModeSet!" neq "-1" choice /t 5 /c ab /d a > nul
 
-REM Set light mode if current time is between light and dark mode start times
-REM If not, set dark mode
-set /a lightTime=%lightTime_HH% * 60 + %lightTime_mm%
-set /a darkTime=%darkTime_HH% * 60 + %darkTime_mm%
-set /a now=%now_HH% * 60 + %now_mm%
-
-set mode=0
-if %now% geq %lightTime% (
-    if %now% leq %darkTime% (
-        set mode=1
+    REM Set current hours and minutes on separate numeric variables
+    REM Ignores regional format, uses 24hr format
+    for /f "tokens=1,2 delims=:" %%a in ('echo %time%') do (
+        set /a now_HH=%%a
+        set now_mm=%%b
     )
-)
-call :setMode %mode%
+    if "!now_mm:~0,1!"=="0" (
+        set /a now_mm=!now_mm:~1,1!
+    ) else (
+        set /a now_mm=!now_mm!
+    )
+
+    REM Set light mode if current time is between light and dark mode start times
+    REM If not, set dark mode
+    set /a now=!now_HH! * 60 + !now_mm!
+
+    set mode=0
+    if !now! geq !lightTime! (
+        if !now! leq !darkTime! (
+            set mode=1
+        )
+    )
+
+    rem Avoid changing windows registry if there is no need
+    if "!mode!"=="!lastModeSet!" goto :loop
+
+    rem Change system colors
+    reg add "!_HKCU!\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme /t REG_DWORD /d !mode! /f >nul 2>&1
+    if !taskBarMode!==2 (
+        reg add "!_HKCU!\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v SystemUsesLightTheme /t REG_DWORD /d !mode! /f >nul 2>&1
+    ) else (
+        reg add "!_HKCU!\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v SystemUsesLightTheme /t REG_DWORD /d !taskBarMode! /f >nul 2>&1
+    )
+    set lastModeSet=!mode!
+
+goto :loop
 exit /b 0
 
-:setMode
-reg add HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize /v AppsUseLightTheme /t REG_DWORD /d %1 /f >nul 2>&1
-if %taskBarMode%==2 (
-    reg add HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize /v SystemUsesLightTheme /t REG_DWORD /d %1 /f >nul 2>&1
-) else (
-    reg add HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize /v SystemUsesLightTheme /t REG_DWORD /d %taskBarMode% /f >nul 2>&1
-)
-exit /b
 
 :uninstall
 call :clearDualEcho
-choice /c %strYesNo% /n /m %strUninstallQuestion%
-if "%errorlevel%" neq "1" (
+choice /c !strYesNo! /n /m !strUninstallQuestion!
+if "!errorlevel!" neq "1" (
     call :clearDualEcho
-    echo %strUninstallCancel%
+    echo !strUninstallCancel!
     echo.
     pause
     exit /b
 )
 call :clearDualEcho
-echo %strUninstalling%
-rmdir /s /q "%localappdata%\LDSwitcher\" >nul 2>&1
-for /f "skip=1 tokens=1 delims=," %%i in ('schtasks /query /tn \LDSwitcher\ /fo csv') do (
-    schtasks /delete /tn %%i /f >nul 2>&1
+echo !strUninstalling!
+schtasks /delete /tn "\LDSwitcherElevation !_username!" /f >nul 2>&1
+rmdir /s /q "!_localappdata!\LDSwitcher\" >nul 2>&1
+schtasks /query /tn \ /fo csv /nh | find /i "\LDSwitcher" >nul 2>&1
+if "!errorlevel!" neq "0" (
+    rmdir /s /q "%systemdrive%\LDSwitcher\" >nul 2>&1
 )
-echo $scheduleObject = New-Object -ComObject Schedule.Service > %temp%\deleteTasksFolder.ps1
-echo $scheduleObject.connect() >> %temp%\deleteTasksFolder.ps1
-echo $rootFolder = $scheduleObject.GetFolder("\") >> %temp%\deleteTasksFolder.ps1
-echo $rootFolder.DeleteFolder("LDSwitcher",$null) >> %temp%\deleteTasksFolder.ps1
-powershell %temp%\deleteTasksFolder.ps1
-del /f /q %temp%\deleteTasksFolder.ps1
+del "!_appdata!\Microsoft\Windows\Start Menu\Programs\Startup\LDSwitcher.vbs" /q
+
 call :clearDualEcho
-echo %strUninstallSuccess%
+echo !strUninstallSuccess!
 echo.
 pause
 exit /b
@@ -472,22 +275,22 @@ exit /b
 :timeInput
 set timeAcu=
 call :timeInput2 012 %1
-if "%timeAcu%"=="2" (
+if "!timeAcu!"=="2" (
     call :timeInput2 0123 %1
 ) else (
     call :timeInput2 0123456789 %1
 )
-set timeAcu=%timeAcu%:
+set timeAcu=!timeAcu!:
 call :timeInput2 012345 %1
 call :timeInput2 0123456789 %1
 exit /b
 :timeInput2
 set message=%2
 call :clearDualEcho
-echo %message:~1,-1%%timeAcu%
+echo !message:~1,-1!!timeAcu!
 choice /c %1 /n
-set /a indexOffset=%errorlevel%-1
-set timeAcu=%timeAcu%%indexOffset%
+set /a indexOffset=!errorlevel!-1
+set timeAcu=!timeAcu!!indexOffset!
 set indexOffset=
 exit /b
 
@@ -497,7 +300,7 @@ cls & echo. & echo.
 exit /b
 
 :cmdColor
-for /f "delims=x tokens=2" %%i in ('reg query HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize /v AppsUseLightTheme') do (
+for /f "delims=x tokens=2" %%i in ('reg query "!_HKCU!\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme') do (
     if "%%i"=="1" ( color f0 ) else ( color 0f )
 )
 exit /b
@@ -505,12 +308,26 @@ exit /b
 :findLang
 if "%1"=="" exit /b 1
 if not defined currentLang (
-    for /f delims^=^"^ tokens^=2 %%i in ('wmic os get MUILanguages / value ^| find "MUILanguages"') do set currentLang=%%i
+    for /f delims^=^"^ tokens^=2 %%i in ('wmic os get MUILanguages /value ^| find "MUILanguages"') do set currentLang=%%i
 )
-echo %currentLang% | find /i "%1" > nul
-exit /b %errorlevel%
+echo !currentLang! | find /i "%1" > nul
+exit /b !errorlevel!
+
+:findVars
+for /f "delims=\_ tokens=3" %%i in ('reg query HKU ^| findstr /e _Classes') do (
+    reg query "HKU\%%i\Volatile Environment" >nul 2>&1
+    if "!errorlevel!"=="0" (
+        for /f "tokens=2* skip=2" %%a in ('reg query "HKU\%%i\Volatile Environment" /v APPDATA') do set _APPDATA=%%b
+        for /f "tokens=2* skip=2" %%a in ('reg query "HKU\%%i\Volatile Environment" /v LOCALAPPDATA') do set _LOCALAPPDATA=%%b
+        for /f "tokens=2* skip=2" %%a in ('reg query "HKU\%%i\Volatile Environment" /v USERNAME') do set _USERNAME=%%b
+        set _HKCU=HKU\%%i
+        exit /b 0
+    )
+)
+exit /b 1
 
 :setLangEs
+set strInit=Inicializando . . .
 set strNotTen1=Esta version de Windows no es compatible con la funcionalidad
 set strNotTen2=de temas claros y oscuros a nivel de sistema operativo.
 set strExit=Presione una tecla para salir . . .
@@ -540,9 +357,11 @@ set strTaskBarOptions=OCH
 set strBarIsDark=La barra de tareas sera siempre oscura
 set strBarIsLight=La barra de tareas sera siempre clara
 set strBarIsAuto=La barra de tareas cambiara de color segun el horario
+set strEnvVarError=Error inesperado al obtener variables de entorno
 exit /b
 
 :setLangEn
+set strInit=Initializing . . .
 set strNotTen1=This Windows version is not compatible with OS-level
 set strNotTen2=light and dark theme.
 set strExit=Press any key to exit . . .
@@ -572,4 +391,5 @@ set strTaskBarOptions=DLT
 set strBarIsDark=Task bar will always be dark
 set strBarIsLight=Task bar will always be light
 set strBarIsAuto=Task bar will change depending on time
+set strEnvVarError=Unexpected error while getting environmental variables
 exit /b
