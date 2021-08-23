@@ -28,7 +28,6 @@ if "!errorlevel!"=="1" (
     exit /b
 )
 
-
 REM Check Windows version
 wmic os get Caption /value | find "Windows 10" >nul 2>&1
 if !errorlevel! neq 0 (
@@ -127,6 +126,12 @@ if !darkStartMin! leq !lightStartMin! (
     goto :install
 )
 
+REM Delete config file for 6 seconds to stop previous instances
+if exist "!_localappdata!\LDSwitcher\config.txt" (
+    del "!_localappdata!\LDSwitcher\config.txt" /q
+    choice /t 6 /c ab /d a > nul
+)
+
 REM Copy required files to separate folder
 mkdir "!_localappdata!\LDSwitcher" >nul 2>&1
 mkdir "%systemdrive%\LDSwitcher" >nul 2>&1
@@ -153,7 +158,7 @@ echo darkTime_HH=!dark_HH! >> "!_localappdata!\LDSwitcher\config.txt"
 echo darkTime_mm=!dark_mm! >> "!_localappdata!\LDSwitcher\config.txt"
 echo taskBarMode=!barMode! >> "!_localappdata!\LDSwitcher\config.txt"
 
-REM Run theme changer from startup vbs script
+REM Run theme changer from scheduled task
 schtasks /run /tn "\LDSwitcherElevation !_username!" /i >nul 2>&1
 
 timeout /t 5 /nobreak > nul
@@ -203,10 +208,8 @@ rem Set light and dark mode start times in minutes
 set /a lightTime=!lightTime_HH! * 60 + !lightTime_mm!
 set /a darkTime=!darkTime_HH! * 60 + !darkTime_mm!
 
-set lastModeSet=-1
 :loop
     if not exist "!_localappdata!\LDSwitcher\config.txt" exit
-    if "!lastModeSet!" neq "-1" choice /t 5 /c ab /d a > nul
 
     REM Set current hours and minutes on separate numeric variables
     REM Ignores regional format, uses 24hr format
@@ -232,7 +235,12 @@ set lastModeSet=-1
     )
 
     rem Avoid changing windows registry if there is no need
-    if "!mode!"=="!lastModeSet!" goto :loop
+    for /f "delims=x tokens=2" %%i in ('reg query "!_HKCU!\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme') do (
+        if "!mode!"=="%%i" (
+            choice /t 5 /c ab /d a > nul
+            goto :loop
+        )
+    )
 
     rem Change system colors
     reg add "!_HKCU!\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme /t REG_DWORD /d !mode! /f >nul 2>&1
@@ -241,7 +249,6 @@ set lastModeSet=-1
     ) else (
         reg add "!_HKCU!\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v SystemUsesLightTheme /t REG_DWORD /d !taskBarMode! /f >nul 2>&1
     )
-    set lastModeSet=!mode!
 
 goto :loop
 exit /b 0
