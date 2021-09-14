@@ -281,7 +281,6 @@ set strNotTen2=light and dark theme.
 set strExit=Press any key to exit . . .
 set strUAC1=This script does not need administrative privileges.
 set strUAC2=Run it again as normal user.
-set strUAC3=Administrator and choose Yes in the pop-up window.
 set strWhatToDo="(M)odify, (U)ninstall o (E)xit:"
 set strWhatToDoOptions=MUE
 set strLightStart="Enter when light mode should start in HH:mm format"
