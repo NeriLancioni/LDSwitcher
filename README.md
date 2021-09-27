@@ -1,10 +1,10 @@
 # LDSwitcher
-Automatically switches Windows 10 light/dark mode according to time.  
+Automatically switches Windows 10 light/dark mode and wallpaper (optional) according to time.  
   
   
   
 ## How to use
-Run this script as a regular user (no elevation needed), select light and dark mode start time, select task bar behaviour, done!  
+Run this script as a regular user (no elevation needed), select light and dark mode start time, select task bar behaviour, select wallpapers (optional) done!  
 If you want to uninstall LDSwitcher, just run the same script!  
 If you want to modify your settings, run the same script again!  
   
@@ -13,7 +13,8 @@ If you want to modify your settings, run the same script again!
 ## What does this script do exactly?
 -When Windows starts, it runs a VBS script. (You can find this file in the "Startup" tab on task manager)  
 -The VBS script silently starts an exact copy of this .bat file as a background process.  
--The background process loads all settings from a file and periodically checks the time and theme of your system.  
+-The background process loads all settings from current user's registry and periodically checks the time and theme of your system.  
+-If you set custom wallpapers for each mode, a PowerShell script will set your wallpaper alongside your system theme.  
 -The following registry values will be changed ONLY when needed, the OS will handle everything needed to apply the theme:  
 <code>Key: HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize - Value: AppsUseLightTheme</code>  
 <code>Key: HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize - Value: SystemUsesLightTheme</code>  
