@@ -43,6 +43,7 @@ if "%errorlevel%"=="0" (
 	exit /b 2
 )
 
+REM Check if more than 1 instance of the installer is running
 for /f "delims=" %%i in ('tasklist /fi "WINDOWTITLE eq LDSwitcher" /fo csv /nh ^| find /c /i "cmd.exe"') do (
     if "%%i" neq "1" (
         call :clearDualEcho
@@ -57,7 +58,7 @@ for /f "delims=" %%i in ('tasklist /fi "WINDOWTITLE eq LDSwitcher" /fo csv /nh ^
 call :cmdColor
 REM Check install status
 REM If not installed, go to installer
-if not exist "%localappdata%\LDSwitcher\" goto :install
+if not exist "%localappdata%\LDSwitcher\LDSwitcher.bat" goto :install
 
 REM If installed, ask if user wants to modify, uninstall or cancel
 call :clearDualEcho
@@ -70,16 +71,12 @@ exit /b
 
 :install
 REM Define light mode start time (24hs format)
-call :timeInput %strLightStart%
-set lightStart=%timeAcu%
+call :timeInput %strLightStart% lightStartMin lightStartStr
 
 REM Define dark mode start time (24hs format)
-call :timeInput %strDarkStart%
-set darkStart=%timeAcu%
+call :timeInput %strDarkStart% darkStartMin darkStartStr
 
 REM Check if light mode starts before dark mode
-set /a lightStartMin=%lightStart:~0,2%*60+%lightStart:~3,2%
-set /a darkStartMin=%darkStart:~0,2%*60+%darkStart:~3,2%
 if %darkStartMin% leq %lightStartMin% (
     call :clearDualEcho
     echo %strLDWrongOrder%
@@ -98,16 +95,48 @@ echo.
 choice /c %strTaskBarOptions% /n
 set /a barMode=%errorlevel%-1
 
+REM Define light and dark wallpapers
+call :clearDualEcho
+echo %strWpMode%
+echo.
+choice /c %strYesNo% /n
+if "%errorlevel%"=="2" goto :noWallpapers
+
+call :WallpaperInput %strLightWp%
+set LightWp=%OutputWallpaper%
+
+call :WallpaperInput %strDarkWp%
+set DarkWp=%OutputWallpaper%
+
+:noWallpapers
 
 call :clearDualEcho
 echo %strInstalling%
 
-REM Stop previous instance
+REM Stop previous background process instance
 taskkill /fi "WINDOWTITLE eq LDSwitcher Background Process" /f >nul 2>&1
 
 REM Copy required files to separate folder
-mkdir "%localappdata%\LDSwitcher" >nul 2>&1
+mkdir "%localappdata%\LDSwitcher\Wallpapers" >nul 2>&1
 copy /y %0 "%localappdata%\LDSwitcher\LDSwitcher.bat" >nul 2>&1
+del /q "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" >nul 2>&1
+dir /b /s /a:a "%localappdata%\LDSwitcher\Wallpapers\*" >nul 2>&1
+if "%errorlevel%"=="0" (
+    for /f "delims=" %%i in ('dir /b /s /a:a "%localappdata%\LDSwitcher\Wallpapers\*"') do (
+        del /q %%i >nul 2>&1
+    )
+)
+
+if not defined LightWp goto :undefinedWpVars
+if not defined DarkWp goto :undefinedWpVars
+    call :deployWallpaperScript "%localappdata%\LDSwitcher\Set-Wallpaper.ps1"
+    for /f "delims=" %%l in ('dir /b %LightWp%') do (
+        copy %LightWp% "%localappdata%\LDSwitcher\Wallpapers\1"%%~xl /y >nul 2>&1
+    )
+    for /f "delims=" %%d in ('dir /b %DarkWp%') do (
+        copy %DarkWp% "%localappdata%\LDSwitcher\Wallpapers\0"%%~xd /y >nul 2>&1
+    )
+:undefinedWpVars
 
 REM Create silent start script
 echo Set WshShell = WScript.CreateObject("WScript.Shell") > "%localappdata%\LDSwitcher\LDSwitcher.vbs"
@@ -127,13 +156,16 @@ REM Run theme changer from startup script
 REM Wait 5 seconds for background process to change current windows theme
 choice /t 5 /c ab /d a > nul
 call :cmdColor
+for /f "delims=x tokens=2" %%i in ('reg query "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme') do (
+    call :setWallpaper %%i
+)
 
 REM Success message and exit
 call :clearDualEcho
 echo %strInstallSuccess%
 echo.
-echo %strLightStartAt% %lightStart%
-echo %strDarkStartAt% %darkStart%
+echo %strLightStartAt% %lightStartStr%
+echo %strDarkStartAt% %darkStartStr%
 if %barMode%==0 ( echo %strBarIsDark% )
 if %barMode%==1 ( echo %strBarIsLight% )
 if %barMode%==2 ( echo %strBarIsAuto% )
@@ -157,7 +189,13 @@ if not defined taskBarMode exit /b 5
 
 :loop
     REM Set current time as minutes
-    set /a now=%time:~0,2%*60+%time:~3,2%
+    echo %time% | findstr /b /c:" " >nul 2>&1
+    if "%errorlevel%"=="0" (
+        set /a now=0
+    ) else (
+        set /a now=%time:~0,1%*600
+    )
+    set /a now=%now%+%time:~1,1%*60+%time:~3,1%*10+%time:~4,1%
 
     REM Set light mode if current time is between light and dark mode start times
     REM If not, set dark mode
@@ -178,6 +216,10 @@ if not defined taskBarMode exit /b 5
     rem Change apps colors
     call :setTheme AppsUseLightTheme %mode%
 
+    rem Change wallpaper
+    if "%errorlevel%"=="0" call :setWallpaper %mode%
+
+
     choice /t 5 /c ab /d a > nul
 goto :loop
 exit /b 0
@@ -185,10 +227,19 @@ exit /b 0
 :setTheme
 rem Avoid changing windows registry if there is no need
 for /f "delims=x tokens=2" %%i in ('reg query "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v %1') do (
-    if "%%i" neq "%2" reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v %1 /t REG_DWORD /d %2 /f >nul 2>&1
+    if "%%i" neq "%2" (
+        reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v %1 /t REG_DWORD /d %2 /f >nul 2>&1
+        exit /b 0
+    )
+)
+exit /b 1
+
+:setWallpaper
+if not exist "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" exit /b
+for /f "delims=" %%i in ('dir /b /s /a:a "%localappdata%\LDSwitcher\Wallpapers\" ^| find "\Wallpapers\%1"') do (
+    powershell -ExecutionPolicy Bypass -file "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" "%%~fi"
 )
 exit /b
-
 
 
 :uninstall
@@ -204,7 +255,7 @@ if "%errorlevel%" neq "1" (
 call :clearDualEcho
 echo %strUninstalling%
 taskkill /fi "WINDOWTITLE eq LDSwitcher Background Process" /f >nul 2>&1
-timeout /t 1 /nobreak > nul
+timeout /t 3 /nobreak > nul
 rmdir /s /q "%localappdata%\LDSwitcher\" >nul 2>&1
 reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v LDSwitcher /f >nul 2>&1
 reg delete "HKCU\SOFTWARE\NeriLancioni\LDSwitcher" /f >nul 2>&1
@@ -218,25 +269,47 @@ pause
 exit /b
 
 :timeInput
-set timeAcu=
+set /a timeAcu=0
+set timeAcuStr=
 call :timeInput2 012 %1
+set /a timeAcu=%timeAcu%+%errorlevel%*600
 if "%timeAcu%"=="2" (
     call :timeInput2 0123 %1
 ) else (
     call :timeInput2 0123456789 %1
 )
-set timeAcu=%timeAcu%:
+set /a timeAcu=%timeAcu%+%errorlevel%*60
+set timeAcuStr=%timeAcuStr%:
 call :timeInput2 012345 %1
+set /a timeAcu=%timeAcu%+%errorlevel%*10
 call :timeInput2 0123456789 %1
-exit /b
+set /a timeAcu=%timeAcu%+%errorlevel%
+set %2=%timeAcu%
+set %3=%timeAcuStr%
+exit /b %timeAcu%
+
 :timeInput2
 set message=%2
 call :clearDualEcho
-echo %message:~1,-1%%timeAcu%
-choice /c %1 /n
+echo %message:~1,-1%%timeAcuStr%
+choice /c %1 /n > nul
 set /a indexOffset=%errorlevel%-1
-set timeAcu=%timeAcu%%indexOffset%
-set indexOffset=
+set timeAcuStr=%timeAcuStr%%indexOffset%
+exit /b %indexOffset%
+
+:WallpaperInput
+call :clearDualEcho
+echo %strWpPath%
+set /p OutputWallpaper=%1
+for /f "delims== tokens=2" %%i in ('set ^| findstr /b OutputWallpaper=') do set OutputWallpaper="%%~fi"
+dir /b %OutputWallpaper% | findstr ".jpg .jpeg .bmp .png .gif" >nul 2>&1
+if "%errorlevel%" neq "0" (
+    call :clearDualEcho
+    echo %strInvalidWp%
+    echo.
+    pause
+    goto :WallpaperInput
+)
 exit /b
 
 REM Trying to save some lines xd
@@ -257,6 +330,25 @@ if not defined currentLang (
 )
 echo %currentLang% | find /i "%1" > nul
 exit /b %errorlevel%
+
+:deployWallpaperScript
+rem thanks to this guy https://c-nergy.be/blog/?p=15291
+echo param ([string]$Image="") > %1
+echo $code = @' >> %1
+echo using System.Runtime.InteropServices;  >> %1
+echo namespace Win32{  >> %1
+echo      public class Wallpaper{  >> %1
+echo         [DllImport("user32.dll", CharSet=CharSet.Auto)]  >> %1
+echo          static extern int SystemParametersInfo (int uAction , int uParam , string lpvParam , int fuWinIni) ;  >> %1
+echo          public static void SetWallpaper(string thePath){  >> %1
+echo             SystemParametersInfo(20,0,thePath,3);  >> %1
+echo          } >> %1
+echo     } >> %1
+echo  }  >> %1
+echo '@ >> %1
+echo add-type $code  >> %1
+echo [Win32.Wallpaper]::SetWallpaper($Image) >> %1
+exit /b
 
 :setLangEs
 set strInit=Inicializando . . .
@@ -289,6 +381,11 @@ set strBarIsDark=La barra de tareas sera siempre oscura
 set strBarIsLight=La barra de tareas sera siempre clara
 set strBarIsAuto=La barra de tareas cambiara de color segun el horario
 set strMultiInstances=No puede haber mas de una instancia de LDSwitcher simultaneamente.
+set strWpMode=Desea definir fondos de pantalla para cada modo? (S/N)
+set strLightWp="Fondo del modo claro: "
+set strDarkWp="Fondo del modo oscuro: "
+set strWpPath=Escriba la ruta completa de la imagen o arrastrela aqui.
+set strInvalidWp=El archivo no es una imagen o no existe.
 exit /b
 
 :setLangEn
@@ -322,4 +419,9 @@ set strBarIsDark=Task bar will always be dark
 set strBarIsLight=Task bar will always be light
 set strBarIsAuto=Task bar will change depending on time
 set strMultiInstances=There cannot be more than one LDSwitcher instance simultaneously.
+set strWpMode=Would you like to set wallpapers for each mode? (Y/N)
+set strLightWp="Light mode wallpaper: "
+set strDarkWp="Dark mode wallpaper: "
+set strWpPath=Write the picture full path here or drag it here.
+set strInvalidWp=File is not a picture or does not exist.
 exit /b
