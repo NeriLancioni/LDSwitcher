@@ -189,19 +189,12 @@ if exist "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" (
 
 :loop
     REM Set current time as minutes
-    echo %time% | findstr /b /c:" " >nul 2>&1 && (
-        set /a now=0
-    ) || (
-        set /a now=%time:~0,1%*600
-    )
+    set /a now=%time:~0,2%*60+%time:~3,2%
 
-    set /a now=%now%+%time:~1,1%*60+%time:~3,1%*10+%time:~4,1%
-
-    REM Set light mode if current time is between light and dark mode start times
-    REM If not, set dark mode
+    REM Set light mode if current time is between light and dark mode start times, else set dark mode
     set mode=0
     if %now% geq %lightTime% (
-        if %now% leq %darkTime% (
+        if %now% lss %darkTime% (
             set mode=1
         )
     )
@@ -218,7 +211,6 @@ if exist "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" (
 
     choice /t 5 /c ab /d a > nul
 goto :loop
-exit /b 0
 
 :setTheme
 rem Avoid changing windows registry if there is no need
@@ -230,7 +222,7 @@ exit /b 1
 
 :setWallpaper
 if "%wallpaperChange%"=="0" exit /b
-for /f "delims=" %%i in ('dir /b /s /a:a "%localappdata%\LDSwitcher\Wallpapers\" ^| find "\Wallpapers\%1"') do (
+for /f "delims=" %%i in ('dir /b /s "%localappdata%\LDSwitcher\Wallpapers\" ^| find "\Wallpapers\%1"') do (
     powershell -ExecutionPolicy Bypass -file "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" "%%~fi"
 )
 exit /b
