@@ -5,11 +5,7 @@ if "%1"=="task" goto :SWITCHER
 title LDSwitcher
 
 REM Detect language
-call :findLang es-
-if "%errorlevel%"=="0" (
-    call :setLangEs
-    goto :langSelected
-)
+call :findLang es- && call :setLangEs & goto :langSelected
 
 REM Default to English
 call :setLangEn
@@ -19,8 +15,7 @@ call :clearDualEcho
 echo %strInit%
 
 REM Check Windows version
-wmic os get Caption /value | find "Windows 10" >nul 2>&1
-if %errorlevel% neq 0 (
+wmic os get Caption /value find "Windows 10" >nul 2>&1 || (
     call :clearDualEcho
     echo %strNotTen1%
     echo %strNotTen2%
@@ -31,8 +26,7 @@ if %errorlevel% neq 0 (
 )
 
 REM Check for admin privileges
-mkdir %windir%\checkYourPrivileges >nul 2>&1
-if "%errorlevel%"=="0" (
+mkdir %windir%\checkYourPrivileges >nul 2>&1 && (
 	rmdir /s /q %windir%\checkYourPrivileges
     call :clearDualEcho
     echo %strUAC1%
@@ -120,8 +114,7 @@ REM Copy required files to separate folder
 mkdir "%localappdata%\LDSwitcher\Wallpapers" >nul 2>&1
 copy /y %0 "%localappdata%\LDSwitcher\LDSwitcher.bat" >nul 2>&1
 del /q "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" >nul 2>&1
-dir /b /s /a:a "%localappdata%\LDSwitcher\Wallpapers\*" >nul 2>&1
-if "%errorlevel%"=="0" (
+dir /b /s /a:a "%localappdata%\LDSwitcher\Wallpapers\*" >nul 2>&1 && (
     for /f "delims=" %%i in ('dir /b /s /a:a "%localappdata%\LDSwitcher\Wallpapers\*"') do (
         del /q %%i >nul 2>&1
     )
@@ -187,14 +180,21 @@ if not defined lightTime exit /b 3
 if not defined darkTime exit /b 4
 if not defined taskBarMode exit /b 5
 
+REM Check if wallpaper script is deployed
+if exist "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" (
+    set wallpaperChange=1
+) else (
+    set wallpaperChange=0
+)
+
 :loop
     REM Set current time as minutes
-    echo %time% | findstr /b /c:" " >nul 2>&1
-    if "%errorlevel%"=="0" (
+    echo %time% | findstr /b /c:" " >nul 2>&1 && (
         set /a now=0
-    ) else (
+    ) || (
         set /a now=%time:~0,1%*600
     )
+
     set /a now=%now%+%time:~1,1%*60+%time:~3,1%*10+%time:~4,1%
 
     REM Set light mode if current time is between light and dark mode start times
@@ -213,12 +213,8 @@ if not defined taskBarMode exit /b 5
         call :setTheme SystemUsesLightTheme %taskBarMode%
     )
 
-    rem Change apps colors
-    call :setTheme AppsUseLightTheme %mode%
-
-    rem Change wallpaper
-    if "%errorlevel%"=="0" call :setWallpaper %mode%
-
+    rem Change apps colors and wallpaper if needed
+    call :setTheme AppsUseLightTheme %mode% && call :setWallpaper %mode%
 
     choice /t 5 /c ab /d a > nul
 goto :loop
@@ -235,7 +231,7 @@ for /f "delims=x tokens=2" %%i in ('reg query "HKCU\SOFTWARE\Microsoft\Windows\C
 exit /b 1
 
 :setWallpaper
-if not exist "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" exit /b
+if "%wallpaperChange%"=="0" exit /b
 for /f "delims=" %%i in ('dir /b /s /a:a "%localappdata%\LDSwitcher\Wallpapers\" ^| find "\Wallpapers\%1"') do (
     powershell -ExecutionPolicy Bypass -file "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" "%%~fi"
 )
@@ -259,8 +255,7 @@ timeout /t 3 /nobreak > nul
 rmdir /s /q "%localappdata%\LDSwitcher\" >nul 2>&1
 reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v LDSwitcher /f >nul 2>&1
 reg delete "HKCU\SOFTWARE\NeriLancioni\LDSwitcher" /f >nul 2>&1
-reg query "HKCU\SOFTWARE\NeriLancioni" | find "\" >nul 2>&1
-if "%errorlevel%" neq 0 reg delete "HKCU\SOFTWARE\NeriLancioni" /f >nul 2>&1
+reg query "HKCU\SOFTWARE\NeriLancioni" | find "\" >nul 2>&1 || reg delete "HKCU\SOFTWARE\NeriLancioni" /f >nul 2>&1
 
 call :clearDualEcho
 echo %strUninstallSuccess%
@@ -302,8 +297,7 @@ call :clearDualEcho
 echo %strWpPath%
 set /p OutputWallpaper=%1
 for /f "delims== tokens=2" %%i in ('set ^| findstr /b OutputWallpaper=') do set OutputWallpaper="%%~fi"
-dir /b %OutputWallpaper% | findstr ".jpg .jpeg .bmp .png .gif" >nul 2>&1
-if "%errorlevel%" neq "0" (
+dir /b %OutputWallpaper% | findstr ".jpg .jpeg .bmp .png .gif" >nul 2>&1 || (
     call :clearDualEcho
     echo %strInvalidWp%
     echo.
