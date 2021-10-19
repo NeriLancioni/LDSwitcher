@@ -316,7 +316,7 @@ echo %currentLang% | find /i "%1" > nul
 exit /b %errorlevel%
 
 :deployWallpaperScript
-rem thanks to this guy https://c-nergy.be/blog/?p=15291
+rem Thanks to this guy https://c-nergy.be/blog/?p=15291
 echo param ([string]$Image="") > %1
 echo $code = @' >> %1
 echo using System.Runtime.InteropServices;  >> %1
