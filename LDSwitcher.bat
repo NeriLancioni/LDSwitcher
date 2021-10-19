@@ -15,7 +15,7 @@ call :clearDualEcho
 echo %strInit%
 
 REM Check Windows version
-wmic os get Caption /value find "Windows 10" >nul 2>&1 || (
+wmic os get Caption /value | findstr /c:"Windows 10" /c:"Windows 11" >nul 2>&1 || (
     call :clearDualEcho
     echo %strNotTen1%
     echo %strNotTen2%
@@ -222,11 +222,9 @@ exit /b 0
 
 :setTheme
 rem Avoid changing windows registry if there is no need
-for /f "delims=x tokens=2" %%i in ('reg query "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v %1') do (
-    if "%%i" neq "%2" (
-        reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v %1 /t REG_DWORD /d %2 /f >nul 2>&1
-        exit /b 0
-    )
+reg query "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v %1 | findstr /e 0x%2 >nul 2>&1 || (
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v %1 /t REG_DWORD /d %2 /f >nul 2>&1
+    exit /b 0
 )
 exit /b 1
 
