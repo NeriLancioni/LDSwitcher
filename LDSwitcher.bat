@@ -112,6 +112,8 @@ taskkill /fi "WINDOWTITLE eq LDSwitcher Background Process" /f >nul 2>&1
 
 REM Copy required files to separate folder
 mkdir "%localappdata%\LDSwitcher\Wallpapers" >nul 2>&1
+mkdir "%localappdata%\LDSwitcher\Addons\OnThemeChange" >nul 2>&1
+mkdir "%localappdata%\LDSwitcher\Addons\Periodical" >nul 2>&1
 copy /y %0 "%localappdata%\LDSwitcher\LDSwitcher.bat" >nul 2>&1
 del /q "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" >nul 2>&1
 dir /b /s /a:a "%localappdata%\LDSwitcher\Wallpapers\*" >nul 2>&1 && (
@@ -187,6 +189,20 @@ if exist "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" (
     set wallpaperChange=0
 )
 
+REM Check if periodical addons exist
+dir /b /s "%localappdata%\LDSwitcher\Addons\Periodical\" | findstr /e /c:".cmd" /c:".bat" && (
+    set execPeriodicalAddons=1
+) || (
+    set execPeriodicalAddons=0
+)
+
+REM Check if on-change addons exist
+dir /b /s "%localappdata%\LDSwitcher\Addons\OnThemeChange\" | findstr /e /c:".cmd" /c:".bat" && (
+    set execOnThemeChangeAddons=1
+) || (
+    set execOnThemeChangeAddons=0
+)
+
 :loop
     REM Set current time as minutes
     set /a now=%time:~0,2%*60+%time:~3,2%
@@ -207,7 +223,8 @@ if exist "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" (
     )
 
     rem Change apps colors and wallpaper if needed
-    call :setTheme AppsUseLightTheme %mode% && call :setWallpaper %mode%
+    call :setTheme AppsUseLightTheme %mode% && (call :setWallpaper %mode% & call :callOnThemeChangeAddons %mode%)
+    call :callPeriodicalAddons %mode%
 
     choice /t 5 /c ab /d a > nul
 goto :loop
@@ -224,6 +241,20 @@ exit /b 1
 if "%wallpaperChange%"=="0" exit /b
 for /f "delims=" %%i in ('dir /b /s "%localappdata%\LDSwitcher\Wallpapers\" ^| find "\Wallpapers\%1"') do (
     powershell -ExecutionPolicy Bypass -file "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" "%%~fi"
+)
+exit /b
+
+:callOnThemeChangeAddons
+if "%execOnThemeChangeAddons%"=="0" exit /b
+for /f "delims=" %%i in ('dir /b /s "%localappdata%\LDSwitcher\Addons\OnThemeChange\" ^| findstr /e /c:".cmd" /c:".bat"') do (
+    call "%%~fi" %1
+)
+exit /b
+
+:callPeriodicalAddons
+if "%execPeriodicalAddons%"=="0" exit /b
+for /f "delims=" %%i in ('dir /b /s "%localappdata%\LDSwitcher\Addons\Periodical\" ^| findstr /e /c:".cmd" /c:".bat"') do (
+    call "%%~fi" %1
 )
 exit /b
 
