@@ -1,22 +1,25 @@
 @echo off
 
 REM If script is being run from vbs script, go to background task
-if "%1"=="task" goto :SWITCHER
+if "%1"=="BackgroundTask" goto :SWITCHER
 title LDSwitcher
 
+for /f "delims=: tokens=2" %%i in ('chcp') do set /a currentChcp=%%i
+chcp 65001 > nul
+
 REM Detect language
-call :findLang es- && call :setLangEs & goto :langSelected
+call :setLangEs && goto :langSelected
 
 REM Default to English
 call :setLangEn
 :langSelected
 
-call :clearDualEcho
+call :banner
 echo %strInit%
 
 REM Check Windows version
 wmic os get Caption /value | findstr /c:"Windows 10" /c:"Windows 11" >nul 2>&1 || (
-    call :clearDualEcho
+    call :banner
     echo %strNotTen1%
     echo %strNotTen2%
     echo.
@@ -28,7 +31,7 @@ wmic os get Caption /value | findstr /c:"Windows 10" /c:"Windows 11" >nul 2>&1 |
 REM Check for admin privileges
 mkdir %windir%\checkYourPrivileges >nul 2>&1 && (
 	rmdir /s /q %windir%\checkYourPrivileges
-    call :clearDualEcho
+    call :banner
     echo %strUAC1%
 	echo %strUAC2%
 	echo.
@@ -40,7 +43,7 @@ mkdir %windir%\checkYourPrivileges >nul 2>&1 && (
 REM Check if more than 1 instance of the installer is running
 for /f "delims=" %%i in ('tasklist /fi "WINDOWTITLE eq LDSwitcher" /fo csv /nh ^| find /c /i "cmd.exe"') do (
     if "%%i" neq "1" (
-        call :clearDualEcho
+        call :banner
         echo %strMultiInstances%
         echo.
         echo %strExit%
@@ -55,7 +58,7 @@ REM If not installed, go to installer
 if not exist "%localappdata%\LDSwitcher\LDSwitcher.bat" goto :install
 
 REM If installed, ask if user wants to modify, uninstall or cancel
-call :clearDualEcho
+call :banner
 echo %strAlreadyInstalled%
 choice /c %strWhatToDoOptions% /n /m %strWhatToDo%
 if "%errorlevel%"=="1" goto :install
@@ -65,14 +68,14 @@ exit /b
 
 :install
 REM Define light mode start time (24hs format)
-call :timeInput %strLightStart% lightStartMin lightStartStr
+call :timeInput %strLightStart% lightStartMin lightStartStr lightTime
 
 REM Define dark mode start time (24hs format)
-call :timeInput %strDarkStart% darkStartMin darkStartStr
+call :timeInput %strDarkStart% darkStartMin darkStartStr darkTime
 
 REM Check if light mode starts before dark mode
 if %darkStartMin% leq %lightStartMin% (
-    call :clearDualEcho
+    call :banner
     echo %strLDWrongOrder%
     echo.
     pause
@@ -80,7 +83,7 @@ if %darkStartMin% leq %lightStartMin% (
 )
 
 REM Define task bar behaviour
-call :clearDualEcho
+call :banner
 echo %strTaskBarModeMsg%
 echo %strTaskBarOptLight%
 echo %strTaskBarOptDark%
@@ -90,7 +93,7 @@ choice /c %strTaskBarOptions% /n
 set /a barMode=%errorlevel%-1
 
 REM Define light and dark wallpapers
-call :clearDualEcho
+call :banner
 echo %strWpMode%
 echo.
 choice /c %strYesNo% /n
@@ -104,7 +107,7 @@ set DarkWp=%OutputWallpaper%
 
 :noWallpapers
 
-call :clearDualEcho
+call :banner
 echo %strInstalling%
 
 REM Stop previous background process instance
@@ -135,7 +138,7 @@ if not defined DarkWp goto :undefinedWpVars
 
 REM Create silent start script
 echo Set WshShell = WScript.CreateObject("WScript.Shell") > "%localappdata%\LDSwitcher\LDSwitcher.vbs"
-echo WshShell.Run """%localappdata%\LDSwitcher\LDSwitcher.bat"" task", 0, False >> "%localappdata%\LDSwitcher\LDSwitcher.vbs"
+echo WshShell.Run """%localappdata%\LDSwitcher\LDSwitcher.bat"" BackgroundTask", 0, False >> "%localappdata%\LDSwitcher\LDSwitcher.vbs"
 
 REM Create startup registry
 reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v LDSwitcher /t REG_SZ /d "\"%localappdata%\LDSwitcher\LDSwitcher.vbs\"" /f >nul 2>&1
@@ -150,13 +153,15 @@ REM Run theme changer from startup script
 
 REM Wait 5 seconds for background process to change current windows theme
 choice /t 5 /c ab /d a > nul
+chcp %currentChcp% > nul
 call :cmdColor
 for /f "delims=x tokens=2" %%i in ('reg query "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme') do (
     call :setWallpaper %%i
 )
+chcp 65001 > nul
 
 REM Success message and exit
-call :clearDualEcho
+call :banner
 echo %strInstallSuccess%
 echo.
 echo %strLightStartAt% %lightStartStr%
@@ -260,16 +265,16 @@ exit /b
 
 
 :uninstall
-call :clearDualEcho
+call :banner
 choice /c %strYesNo% /n /m %strUninstallQuestion%
 if "%errorlevel%" neq "1" (
-    call :clearDualEcho
+    call :banner
     echo %strUninstallCancel%
     echo.
     pause
     exit /b
 )
-call :clearDualEcho
+call :banner
 echo %strUninstalling%
 taskkill /fi "WINDOWTITLE eq LDSwitcher Background Process" /f >nul 2>&1
 timeout /t 3 /nobreak > nul
@@ -278,27 +283,28 @@ reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v LDSwitcher /f
 reg delete "HKCU\SOFTWARE\NeriLancioni\LDSwitcher" /f >nul 2>&1
 reg query "HKCU\SOFTWARE\NeriLancioni" | find "\" >nul 2>&1 || reg delete "HKCU\SOFTWARE\NeriLancioni" /f >nul 2>&1
 
-call :clearDualEcho
+call :banner
 echo %strUninstallSuccess%
 echo.
 pause
 exit /b
 
 :timeInput
+call :MinutesToHHMM %4 currentHHMM
 set /a timeAcu=0
 set timeAcuStr=
-call :timeInput2 012 %1
+call :timeInput2 012 %1 %currentHHMM% __:__
 set /a timeAcu=%timeAcu%+%errorlevel%*600
 if "%timeAcu%"=="2" (
-    call :timeInput2 0123 %1
+    call :timeInput2 0123 %1 %currentHHMM% _:__
 ) else (
-    call :timeInput2 0123456789 %1
+    call :timeInput2 0123456789 %1 %currentHHMM% _:__
 )
 set /a timeAcu=%timeAcu%+%errorlevel%*60
 set timeAcuStr=%timeAcuStr%:
-call :timeInput2 012345 %1
+call :timeInput2 012345 %1 %currentHHMM% __
 set /a timeAcu=%timeAcu%+%errorlevel%*10
-call :timeInput2 0123456789 %1
+call :timeInput2 0123456789 %1 %currentHHMM% _ 
 set /a timeAcu=%timeAcu%+%errorlevel%
 set %2=%timeAcu%
 set %3=%timeAcuStr%
@@ -306,20 +312,42 @@ exit /b %timeAcu%
 
 :timeInput2
 set message=%2
-call :clearDualEcho
-echo %message:~1,-1%%timeAcuStr%
+call :banner
+echo %message:~1,-1%
+if "%3" neq "none" echo %strCurrentValue% %3
+echo %strNewValue% %timeAcuStr%%4
 choice /c %1 /n > nul
 set /a indexOffset=%errorlevel%-1
 set timeAcuStr=%timeAcuStr%%indexOffset%
 exit /b %indexOffset%
 
+:MinutesToHHMM
+reg query HKCU\SOFTWARE\NeriLancioni\LDSwitcher /v %1 >nul 2>&1
+if "%errorlevel%" neq "0" (
+    set %2=none
+    exit /b
+)
+for /f "delims=" %%i in ('reg query HKCU\SOFTWARE\NeriLancioni\LDSwitcher /v %1') do set InputMinutes=%%i
+set /a InputMinutes=%InputMinutes:~-4%
+set /a AuxHH=%InputMinutes%/60
+set /a AuxMM=%InputMinutes%-%AuxHH%*60
+if %AuxHH% gtr 9 (
+    set %2=%AuxHH%:%AuxMM%
+) else (
+    set %2=0%AuxHH%:%AuxMM%
+)
+set InputMinutes=
+set AuxHH=
+set AuxMM=
+exit /b
+
 :WallpaperInput
-call :clearDualEcho
+call :banner
 echo %strWpPath%
 set /p OutputWallpaper=%1
 for /f "delims== tokens=2" %%i in ('set ^| findstr /b OutputWallpaper=') do set OutputWallpaper="%%~fi"
 dir /b %OutputWallpaper% | findstr ".jpg .jpeg .bmp .png .gif" >nul 2>&1 || (
-    call :clearDualEcho
+    call :banner
     echo %strInvalidWp%
     echo.
     pause
@@ -327,24 +355,11 @@ dir /b %OutputWallpaper% | findstr ".jpg .jpeg .bmp .png .gif" >nul 2>&1 || (
 )
 exit /b
 
-REM Trying to save some lines xd
-:clearDualEcho
-cls & echo. & echo.
-exit /b
-
 :cmdColor
 for /f "delims=x tokens=2" %%i in ('reg query "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme') do (
     if "%%i"=="1" ( color f0 ) else ( color 0f )
 )
 exit /b
-
-:findLang
-if "%1"=="" exit /b 1
-if not defined currentLang (
-    for /f delims^=^"^ tokens^=2 %%i in ('wmic os get MUILanguages /value ^| find "MUILanguages"') do set currentLang=%%i
-)
-echo %currentLang% | find /i "%1" > nul
-exit /b %errorlevel%
 
 :deployWallpaperScript
 rem Thanks to this guy https://c-nergy.be/blog/?p=15291
@@ -365,7 +380,33 @@ echo add-type $code  >> %1
 echo [Win32.Wallpaper]::SetWallpaper($Image) >> %1
 exit /b
 
+:banner
+cls
+echo.
+echo ===================================================================================
+echo ^|                                                                                 ^|
+echo ^|  #       #####     ######                                                       ^|
+echo ^|  #       #    #   #                                                             ^|
+echo ^|  #       #     #  #         #         #   #  #####  #####  #   #  #####  ####   ^|
+echo ^|  #       #     #   ######   #         #   #    #    #      #   #  #      #   #  ^|
+echo ^|  #       #     #         #   #   #   #    #    #    #      #####  ###    ####   ^|
+echo ^|  #       #    #          #   #  # #  #    #    #    #      #   #  #      #  #   ^|
+echo ^|  ######  #####     ######     ##   ##     #    #    #####  #   #  #####  #   #  ^|
+echo ^|                                                                                 ^|
+echo ===================================================================================
+echo.
+echo.
+exit /b
+
+:findLang
+if not defined currentLang (
+    for /f delims^=^"^ tokens^=2 %%i in ('wmic os get MUILanguages /value ^| find "MUILanguages"') do set currentLang=%%i
+)
+echo %currentLang% | find /i "%1" > nul
+exit /b %errorlevel%
+
 :setLangEs
+call :findLang es- || exit /b 1
 set strInit=Inicializando . . .
 set strNotTen1=Esta version de Windows no es compatible con la funcionalidad
 set strNotTen2=de temas claros y oscuros a nivel de sistema operativo.
@@ -374,17 +415,17 @@ set strUAC1=Este script no necesita permisos administrativos.
 set strUAC2=Ejecutelo nuevamente como usuario normal.
 set strWhatToDo="(M)odificar, (D)esinstalar o (S)alir:"
 set strWhatToDoOptions=MDS
-set strLightStart="Ingrese a que hora deberia iniciar el modo claro en formato HH:mm - "
-set strDarkStart="Ingrese a que hora deberia iniciar el modo oscuro en formato HH:mm - "
+set strLightStart="Ingrese a que hora deberia iniciar el modo claro en formato HH:mm"
+set strDarkStart="Ingrese a que hora deberia iniciar el modo oscuro en formato HH:mm"
 set strLDWrongOrder=El modo oscuro debe iniciar luego del modo claro
 set strInstallSuccess=Instalacion completada exitosamente!
 set strLightStartAt=El modo claro iniciara a las
 set strDarkStartAt=El modo oscuro iniciara a las
-set strUninstallQuestion="Esta seguro que desea desinstalar LDSwitcher? (S/N):"
+set strUninstallQuestion="¿Esta seguro que desea desinstalar LDSwitcher? (S/N):"
 set strYesNo=SN
 set strUninstallCancel=Ha cancelado la desinstalacion
 set strUninstallSuccess=LDSwitcher fue desinstalado de su equipo
-set strAlreadyInstalled=LDSwitcher ya esta instalado. Que desea hacer?
+set strAlreadyInstalled=LDSwitcher ya esta instalado. ¿Que desea hacer?
 set strInstalling=Instalando . . .
 set strUninstalling=Desinstalando . . .
 set strTaskBarModeMsg=Elija el comportamiento de la barra de tareas:
@@ -396,12 +437,14 @@ set strBarIsDark=La barra de tareas sera siempre oscura
 set strBarIsLight=La barra de tareas sera siempre clara
 set strBarIsAuto=La barra de tareas cambiara de color segun el horario
 set strMultiInstances=No puede haber mas de una instancia de LDSwitcher simultaneamente.
-set strWpMode=Desea definir fondos de pantalla para cada modo? (S/N)
+set strWpMode=¿Desea definir fondos de pantalla para cada modo? (S/N)
 set strLightWp="Fondo del modo claro: "
 set strDarkWp="Fondo del modo oscuro: "
 set strWpPath=Escriba la ruta completa de la imagen o arrastrela aqui.
 set strInvalidWp=El archivo no es una imagen o no existe.
-exit /b
+set strCurrentValue=Valor actual:
+set strNewValue=Valor nuevo:
+exit /b 0
 
 :setLangEn
 set strInit=Initializing . . .
@@ -439,4 +482,6 @@ set strLightWp="Light mode wallpaper: "
 set strDarkWp="Dark mode wallpaper: "
 set strWpPath=Write the picture full path here or drag it here.
 set strInvalidWp=File is not a picture or does not exist.
-exit /b
+set strCurrentValue=Current value:
+set strNewValue=New value:
+exit /b 0
