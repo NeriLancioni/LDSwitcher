@@ -1,7 +1,7 @@
 @echo off
 
 REM If script is being run from vbs script, go to background task
-if "%1"=="BackgroundTask" goto :SWITCHER
+if "%~1"=="BackgroundTask" goto :SWITCHER
 title LDSwitcher
 
 for /f "delims=: tokens=2" %%i in ('chcp') do set /a currentChcp=%%i
@@ -56,6 +56,13 @@ call :cmdColor
 REM Check install status
 REM If not installed, go to installer
 if not exist "%localappdata%\LDSwitcher\LDSwitcher.bat" goto :install
+
+REM Check if first argument is a bat or cmd file
+echo '%~x1' | findstr /i /c:"'.bat'" /c:"'.cmd'" >nul 2>&1 && (
+    if exist "%~f1" (
+        goto :installAddon
+    )
+)
 
 REM If installed, ask if user wants to modify, uninstall or cancel
 call :banner
@@ -171,6 +178,46 @@ if %barMode%==1 ( echo %strBarIsLight% )
 if %barMode%==2 ( echo %strBarIsAuto% )
 echo.
 echo.
+pause
+exit /b
+
+
+
+:installAddon
+REM Check if first line indicates the folder to copy to
+type "%~f1" | findstr /n . | findstr /b /c:"1:::OnThemeChange" >nul 2>&1 && (
+    set errorlevel=1
+    goto :skipAddonChoice
+)
+type "%~f1" | findstr /n . | findstr /b /c:"1:::Periodical" >nul 2>&1 && (
+    set errorlevel=2
+    goto :skipAddonChoice
+)
+
+REM Ask the user when to run the addon
+call :banner
+echo %strAddonInstallText%
+echo %~f1
+echo.
+echo %strOptAlongWindows%
+echo %strOptPeriodical%
+choice /c %strAddonOptions% /n
+:skipAddonChoice
+if %errorlevel%==1 (
+    set folder=OnThemeChange
+) else (
+    set folder=Periodical
+)
+
+REM Copy addon to addons folder, kill current instance of background process, re-run LDSwitcher
+call :banner
+echo %strInstalling%
+copy /y "%~f1" "%localappdata%\LDSwitcher\Addons\%folder%\" >nul 2>&1
+taskkill /fi "WINDOWTITLE eq LDSwitcher Background Process" /f >nul 2>&1
+"%localappdata%\LDSwitcher\LDSwitcher.vbs" >nul 2>&1
+
+call :banner
+echo %strAddonInstalledOK%
 pause
 exit /b
 
@@ -444,6 +491,11 @@ set strWpPath=Escriba la ruta completa de la imagen o arrastrela aqui.
 set strInvalidWp=El archivo no es una imagen o no existe.
 set strCurrentValue=Valor actual:
 set strNewValue=Valor nuevo:
+set strAddonInstallText=¿Cuando desea que se ejecute este Add-On? (W/P)
+set strOptAlongWindows=Junto al tema de (W)indows
+set strOptPeriodical=(P)eriodicamente
+set strAddonOptions=WP
+set strAddonInstalledOK=Add-On instalado correctamente.
 exit /b 0
 
 :setLangEn
@@ -484,4 +536,9 @@ set strWpPath=Write the picture full path here or drag it here.
 set strInvalidWp=File is not a picture or does not exist.
 set strCurrentValue=Current value:
 set strNewValue=New value:
+set strAddonInstallText=When would you like to run this Add-On? (W/P)
+set strOptAlongWindows=Alongside (W)indows theme
+set strOptPeriodical=(P)eriodically
+set strAddonOptions=WP
+set strAddonInstalledOK=Add-On installed successfully.
 exit /b 0

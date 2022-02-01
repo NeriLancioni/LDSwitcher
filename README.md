@@ -7,6 +7,7 @@ Automatically switches Windows 10 and Windows 11 light/dark mode and wallpaper (
 Run this script as a regular user (no elevation needed), select light and dark mode start time, select task bar behaviour, select wallpapers (optional) done!  
 If you want to uninstall LDSwitcher, just run the same script!  
 If you want to modify your settings, run the same script again!  
+Additionaly you can drag and drop any .bat or .cmd file to this script to use it as an add-on.  
   
   
   
@@ -15,6 +16,7 @@ If you want to modify your settings, run the same script again!
 -The VBS script silently starts an exact copy of this .bat file as a background process.  
 -The background process loads all settings from current user's registry and periodically checks the time and theme of your system.  
 -If you set custom wallpapers for each mode, a PowerShell script will set your wallpaper alongside your system theme.  
+-If you use Add-On's, "on change" ones will run when changing Windows theme and "periodical" ones will run every 5 seconds.  
 -The following registry values will be changed ONLY when needed, the OS will handle everything needed to apply the theme:  
 <code>Key: HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize - Value: AppsUseLightTheme</code>  
 <code>Key: HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize - Value: SystemUsesLightTheme</code>  

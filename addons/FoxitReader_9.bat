@@ -1,3 +1,4 @@
+::OnThemeChange
 rem This script changes Foxit Reader 9+ theme.
 rem Copy it in "%localappdata%\LDSwitcher\Addons\OnThemeChange\".
 rem Theme will be changed when you re-launch Foxit Reader.

@@ -1,3 +1,4 @@
+::OnThemeChange
 rem This script changes Media Player Classic Home Cinema 1.9+ theme.
 rem Copy it in "%localappdata%\LDSwitcher\Addons\OnThemeChange\".
 rem Theme will be changed when you re-launch Media Player Classic Home Cinema.
