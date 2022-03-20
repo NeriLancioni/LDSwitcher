@@ -233,6 +233,11 @@ REM Check if needed variables are defined
 if not defined lightTime exit /b 3
 if not defined darkTime exit /b 4
 if not defined taskBarMode exit /b 5
+if not defined enableLogging set enableLogging=0
+
+if "%enableLogging%"=="1" (
+    mkdir "%localappdata%\LDSwitcher\Logs\" >nul 2>&1
+)
 
 REM Check if wallpaper script is deployed
 if exist "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" (
@@ -258,6 +263,9 @@ dir /b /s "%localappdata%\LDSwitcher\Addons\OnThemeChange\" | findstr /e /c:".cm
 :loop
     REM Set current time as minutes
     set /a now=%time:~0,2%*60+%time:~3,2%
+    if "%enableLogging%"=="1" (
+        echo Last loop ran at %time% > "%localappdata%\LDSwitcher\Logs\LastLoopRunTime.txt"
+    )
 
     REM Set light mode if current time is between light and dark mode start times, else set dark mode
     set mode=0
@@ -378,11 +386,9 @@ for /f "delims=" %%i in ('reg query HKCU\SOFTWARE\NeriLancioni\LDSwitcher /v %1'
 set /a InputMinutes=%InputMinutes:~-4%
 set /a AuxHH=%InputMinutes%/60
 set /a AuxMM=%InputMinutes%-%AuxHH%*60
-if %AuxHH% gtr 9 (
-    set %2=%AuxHH%:%AuxMM%
-) else (
-    set %2=0%AuxHH%:%AuxMM%
-)
+if %AuxHH% leq 9 set AuxHH=0%AuxHH%
+if %AuxMM% leq 9 set AuxMM=0%AuxMM%
+set %2=%AuxHH%:%AuxMM%
 set InputMinutes=
 set AuxHH=
 set AuxMM=
