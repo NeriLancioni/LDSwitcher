@@ -262,7 +262,9 @@ dir /b /s "%localappdata%\LDSwitcher\Addons\OnThemeChange\" | findstr /e /c:".cm
 
 :loop
     REM Set current time as minutes
-    set /a now=%time:~0,1%*600+%time:~1,1%*60+%time:~3,1%*10+%time:~4,1%
+    set /a now=%time:~1,1%*60+%time:~3,1%*10+%time:~4,1%
+    if "%time:~0,1%" neq " " set /a now=%now%+%time:~0,1%*600
+
     if "%enableLogging%"=="1" (
         echo Last loop ran at %time% > "%localappdata%\LDSwitcher\Logs\LastLoopRunTime.txt"
     )
