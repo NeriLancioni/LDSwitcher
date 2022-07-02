@@ -13,6 +13,7 @@ if not defined NLQCounter (
 if %NLQCounter% lss 60 exit /b
 set NLQCounter=0
 
+rem Query registry value and ignore first 46 characters (23 bytes, 2 characters per byte)
 for /f "tokens=3 delims= " %%i in ('reg query "HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\CloudStore\Store\DefaultAccount\Current\default$windows.data.bluelightreduction.settings\windows.data.bluelightreduction.settings" /v Data') do (
     set NLQ=%%i
 )
@@ -61,14 +62,12 @@ rem Trims NLQ variable until the desired 4 character pattern is found.
 rem Assigns new value to itself. Includes the pattern.
 rem If pattern is not found it does nothing.
 :TrimUntilMatch
-set trimAux=
 set /a index=0
 :trimLoop
     call set trimAux=%%NLQ:~%index%,4%%
     if "%trimAux%"=="" exit /b 1
     if "%trimAux%"=="%1" (
         call set NLQ=%%NLQ:~%index%%%
-
         exit /b 0
     )
     set /a index=%index%+2
@@ -93,3 +92,31 @@ if "%input:~0,2%"=="2E" (
     exit /b 0
 )
 exit /b 1
+
+
+
+rem In case anyone is interested about Night Light and registry:
+rem The key is HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\CloudStore\Store\DefaultAccount\Current\default$windows.data.bluelightreduction.settings\windows.data.bluelightreduction.settings
+rem The value "Data" contains all Night Light related settings in a string of bytes.
+rem Useful data for this addon are marked with an asterisk.
+rem My conclusions (that seems to work at least for me) about what these bytes mean are:
+rem 10 bytes  -  Constant 43,42,01,00,0a,02,01,00,2a,06.
+rem 5 bytes   -  Supposed to be last modified unix timestamp in seconds (only first 2 bytes seem to change).
+rem 8 bytes   -  Supposed to be constant, 4th bit is not, and it seems to be an hour as it is preceeded with a "0e" byte.
+rem 2 bytes*  -  Schedule status. they are always 02,01 and are present when Night Light is scheduled. If not scheduled this 2 bytes don't exist.
+rem 3 bytes*  -  They are always c2,0a,00 and determine if the user has set custom times for Night Light. If these bytes aren't present, settings are determined by location.
+rem 2 bytes*  -  Constant ca,14 delimiter. following bytes are manual settings for Night Light starting time.
+rem 2 bytes*  -  Night light start HOURS (manual settings). 1st byte is a delimiter (0e), 2nd byte is HH in hexadecimal. If HH is 0 both bytes are absent.
+rem 2 bytes*  -  Night light start MINUTES (manual settings). 1st byte is a delimiter (2e), 2nd byte is MM in hexadecimal. If MM is 0 both bytes are absent.
+rem 3 bytes*  -  Constant 00,ca,1e delimiter. following bytes are manual settings for Night Light ending time.
+rem 2 bytes*  -  Night light end HOURS (manual settings). 1st byte is a delimiter (0e), 2nd byte is HH in hexadecimal. If HH is 0 both bytes are absent.
+rem 2 bytes*  -  Night light end MINUTES (manual settings). 1st byte is a delimiter (2e), 2nd byte is MM in hexadecimal. If MM is 0 both bytes are absent.
+rem 3 bytes   -  Constant 00,cf,28. delimiter for temperature?
+rem 2 bytes   -  Supposedly color temperature in Kelvin. I didn't need it, so I mostly ignored this.
+rem 2 bytes*  -  Constant ca,32 delimiter. following bytes are automatic settings for Night Light starting time.
+rem 2 bytes*  -  Night light start HOURS (automatic settings). 1st byte is a delimiter (0e), 2nd byte is HH in hexadecimal. If HH is 0 both bytes are absent.
+rem 2 bytes*  -  Night light start MINUTES (automatic settings). 1st byte is a delimiter (2e), 2nd byte is MM in hexadecimal. If MM is 0 both bytes are absent.
+rem 3 bytes*  -  Constant 00,ca,3c delimiter. following bytes are automatic settings for Night Light ending time.
+rem 2 bytes*  -  Night light end HOURS (automatic settings). 1st byte is a delimiter (0e), 2nd byte is HH in hexadecimal. If HH is 0 both bytes are absent.
+rem 2 bytes*  -  Night light end MINUTES (automatic settings). 1st byte is a delimiter (2e), 2nd byte is MM in hexadecimal. If MM is 0 both bytes are absent.
+rem 5 bytes   -  Constant 00,00,00,00,00.
