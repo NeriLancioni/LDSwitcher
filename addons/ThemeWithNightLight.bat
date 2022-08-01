@@ -19,13 +19,6 @@ for /f "tokens=3 delims= " %%i in ('reg query "HKEY_CURRENT_USER\SOFTWARE\Micros
 )
 set NLQ=%NLQ:~46%
 
-rem If Night Light is not programmed, load default LDSwitcher values
-echo %NLQ% | findstr /b 0201 >nul 2>&1 || (
-    for /f "skip=2 tokens=3 delims= " %%a in ('reg query HKCU\SOFTWARE\NeriLancioni\LDSwitcher /v lightTime') do set /a lightTime=%%a
-    for /f "skip=2 tokens=3 delims= " %%a in ('reg query HKCU\SOFTWARE\NeriLancioni\LDSwitcher /v darkTime') do set /a darkTime=%%a
-    exit /b
-)
-
 rem Check if Night Light settings are manual or automatic
 echo %NLQ% | findstr /b 0201C20A00 >nul 2>&1 && (
     set Trim1=CA14
@@ -54,6 +47,11 @@ call :SetVarAsNeeded End %NLQ:~8,4%
 rem Set new light and dark times for LDSwitcher
 set /a lightTime=%EndHH%*60+%EndMM%
 set /a darkTime=%StartHH%*60+%StartMM%
+
+rem Save new start times in registry
+reg add "HKCU\SOFTWARE\NeriLancioni\LDSwitcher" /v lightTime /t REG_SZ /d %lightTime% /f >nul 2>&1
+reg add "HKCU\SOFTWARE\NeriLancioni\LDSwitcher" /v darkTime /t REG_SZ /d %darkTime% /f >nul 2>&1
+
 exit /b
 
 
