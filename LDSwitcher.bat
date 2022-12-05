@@ -1,4 +1,4 @@
-@echo off
+@echo off 
 
 REM If script is being run from vbs script, go to background task
 if "%~1"=="BackgroundTask" goto :SWITCHER
