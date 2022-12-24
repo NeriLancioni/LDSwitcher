@@ -1,5 +1,5 @@
 # LDSwitcher
-Automatically switches Windows 10 and Windows 11 light/dark mode and wallpaper (optional) according to time.  
+Automatically switches Windows 10 light/dark mode and wallpaper (optional) according to time.  
   
   
   
