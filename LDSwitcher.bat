@@ -18,7 +18,7 @@ call :banner
 echo %strInit%
 
 REM Check Windows version
-wmic os get Caption /value | findstr /c:"Windows 10" /c:"Windows 11" >nul 2>&1 || (
+wmic os get Caption /value | findstr /c:"Windows 10" >nul 2>&1 || (
     call :banner
     echo %strNotTen1%
     echo %strNotTen2%
