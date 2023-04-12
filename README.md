@@ -1,12 +1,12 @@
 # LDSwitcher
-Automatically switches Windows 10 light/dark mode and wallpaper (optional) according to time.  
+Automatically switches Windows 10 and 11 light/dark mode and wallpaper (optional) according to time.  
   
   
   
 ## How to use
-Run this script as a regular user (no elevation needed), select light and dark mode start time, select task bar behaviour, select wallpapers (optional) done!  
+Run this script as a regular user (no elevation needed), select light and dark mode start time, select task bar behaviour, select wallpapers (optional), done!  
 If you want to uninstall LDSwitcher, just run the same script!  
-If you want to modify your settings, run the same script again!  
+If you want to modify your settings, run the same script again! 
 Additionaly you can drag and drop any .bat or .cmd file to this script to use it as an add-on.  
   
   
@@ -15,14 +15,20 @@ Additionaly you can drag and drop any .bat or .cmd file to this script to use it
 -When Windows starts, it runs a VBS script. (You can find this file in the "Startup" tab on task manager)  
 -The VBS script silently starts an exact copy of this .bat file as a background process.  
 -The background process loads all settings from current user's registry and periodically checks the time and theme of your system.  
--If you set custom wallpapers for each mode, a PowerShell script will set your wallpaper alongside your system theme.  
--If you use Add-On's, "on change" ones will run when changing Windows theme and "periodical" ones will run every 5 seconds.  
--The following registry values will be changed ONLY when needed, the OS will handle everything needed to apply the theme:  
-<code>Key: HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize - Value: AppsUseLightTheme</code>  
-<code>Key: HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize - Value: SystemUsesLightTheme</code>  
+-Windows 11 doesn't like registry changes to apply light/dark mode, so it works differently depending on your operating system:  
+-On Windows 10:  
+----If you set custom wallpapers for each mode, a PowerShell script will set your wallpaper alongside your system theme.  
+----The following registry values will be changed ONLY when needed, the OS will handle everything needed to apply the theme:  
+----<code>Key: HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize - Value: AppsUseLightTheme</code>  
+----<code>Key: HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize - Value: SystemUsesLightTheme</code>  
+-On Windows 11:  
+----Reads currently applied theme, accent color and current wallpaper (if needed) from registry  
+----Generates a new theme replacing the following lines: Wallpaper, SystemMode, AppMode, ColorizationColor  
+----Applies new theme with ThemeSwitcher.exe (thanks WinAero team!)  
+-Additionally for both cases: If you use Add-On's, "on change" ones will run when changing Windows theme and "periodical" ones will run every 5 seconds.  
   
-
-
+  
+  
 ## Suggested wallpapers
 Here are some light/dark wallpaper combinations to apply with this script. Feel free to suggest more!  
   
@@ -50,4 +56,3 @@ MacOS Ventura [Light](https://512pixels.net/downloads/macos-wallpapers-6k/13-Ven
 -Supports English and Spanish languages. Translators are welcome! :)  
 -When running it, it will actually have the same color scheme as your current Windows theme.  
 -When setup/modify finishes, your new Windows theme will also reflect on the script theme.  
--Everything it needs to run is inside a single script. No need to have EXE files, add exceptions to your AV software, install a runtime, etc.  

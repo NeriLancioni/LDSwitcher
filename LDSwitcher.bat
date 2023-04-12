@@ -1,5 +1,8 @@
 @echo off
 
+REM Detect Windows version
+for /f "tokens=3 delims= " %%i in ('wmic os get Caption /value ^| find "Caption="') do set WindowsVersion=%%i
+
 REM If script is being run from vbs script, go to background task
 if "%~1"=="BackgroundTask" goto :SWITCHER
 title LDSwitcher
@@ -18,7 +21,7 @@ call :banner
 echo %strInit%
 
 REM Check Windows version
-wmic os get Caption /value | findstr /c:"Windows 10" >nul 2>&1 || (
+echo %WindowsVersion% | findstr /c:"10" /c:"11" >nul 2>&1 || (
     call :banner
     echo %strNotTen1%
     echo %strNotTen2%
@@ -41,7 +44,7 @@ mkdir %windir%\checkYourPrivileges >nul 2>&1 && (
 )
 
 REM Check if more than 1 instance of the installer is running
-for /f "delims=" %%i in ('tasklist /fi "WINDOWTITLE eq LDSwitcher" /fo csv /nh ^| find /c /i "cmd.exe"') do (
+for /f "delims=" %%i in ('tasklist /fi "WINDOWTITLE eq LDSwitcher" /fo csv /nh ^| findstr /c:"cmd.exe" /c:"WindowsTerminal.exe" ^| find /c /i ".exe"') do (
     if "%%i" neq "1" (
         call :banner
         echo %strMultiInstances%
@@ -74,6 +77,16 @@ if "%errorlevel%"=="3" exit /b
 exit /b
 
 :install
+REM Check if Windows version is 11 and ThemeSwitcher.exe exists
+if "%WindowsVersion%"=="11" (
+    dir /b "%~dp0ThemeSwitcher.exe" >nul 2>&1 || (
+        echo %strThemeSwitcherMissing%
+        echo.
+        echo %strExit%
+        exit /b 1
+    )
+)
+
 REM Define light mode start time (24hs format)
 call :timeInput %strLightStart% lightStartMin lightStartStr lightTime
 
@@ -142,6 +155,9 @@ if not defined DarkWp goto :undefinedWpVars
         copy %DarkWp% "%localappdata%\LDSwitcher\Wallpapers\0"%%~xd /y >nul 2>&1
     )
 :undefinedWpVars
+
+REM Copy ThemeSwitcher.exe if needed
+if "%WindowsVersion%"=="11" copy /y "%~dp0ThemeSwitcher.exe" "%localappdata%\LDSwitcher\ThemeSwitcher.exe" >nul 2>&1
 
 REM Create silent start script
 echo Set WshShell = WScript.CreateObject("WScript.Shell") > "%localappdata%\LDSwitcher\LDSwitcher.vbs"
@@ -239,26 +255,30 @@ if "%enableLogging%"=="1" (
     mkdir "%localappdata%\LDSwitcher\Logs\" >nul 2>&1
 )
 
-REM Check if wallpaper script is deployed
-if exist "%localappdata%\LDSwitcher\Set-Wallpaper.ps1" (
-    set wallpaperChange=1
-) else (
-    set wallpaperChange=0
+REM Check for custom wallpapers
+for /f "delims=" %%i in ('dir /b "%localappdata%\LDSwitcher\Wallpapers\*.*" ^| find /c "."') do (
+    if "%%i"=="2" (
+        set wallpaperChange=1
+    ) else (
+        set wallpaperChange=0
+    )
 )
 
-REM Check if periodical addons exist
+REM Check for periodical addons
 dir /b /s "%localappdata%\LDSwitcher\Addons\Periodical\" | findstr /e /c:".cmd" /c:".bat" && (
     set execPeriodicalAddons=1
 ) || (
     set execPeriodicalAddons=0
 )
 
-REM Check if on-change addons exist
+REM Check for on-change addons
 dir /b /s "%localappdata%\LDSwitcher\Addons\OnThemeChange\" | findstr /e /c:".cmd" /c:".bat" && (
     set execOnThemeChangeAddons=1
 ) || (
     set execOnThemeChangeAddons=0
 )
+
+if "%WindowsVersion%"=="11" goto :loopW11
 
 :loop
     REM Set current time as minutes
@@ -290,6 +310,117 @@ dir /b /s "%localappdata%\LDSwitcher\Addons\OnThemeChange\" | findstr /e /c:".cm
 
     choice /t 5 /c ab /d a > nul
 goto :loop
+
+
+:loopW11
+    if defined now choice /t 5 /c ab /d a > nul
+
+    REM Set current time as minutes
+    set /a now=%time:~1,1%*60+%time:~3,1%*10+%time:~4,1%
+    if "%time:~0,1%" neq " " set /a now=%now%+%time:~0,1%*600
+
+    if "%enableLogging%"=="1" (
+        echo Last loop ran at %time% > "%localappdata%\LDSwitcher\Logs\LastLoopRunTime.txt"
+    )
+
+    REM Set light mode if current time is between light and dark mode start times, else set dark mode
+    set mode=0Dark
+    if %now% geq %lightTime% (
+        if %now% lss %darkTime% (
+            set mode=1Light
+        )
+    )
+
+    REM Run periodical addons
+    call :callPeriodicalAddons %mode%
+
+    REM If theme change is not needed restart loop
+    reg query "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme | findstr /e 0x%mode:~0,1% >nul 2>&1 && goto :loopW11
+
+    if "%wallpaperChange%"=="0" (
+        set WP=""
+    ) else (
+        for /f "delims=" %%i in ('dir /b /s "%localappdata%\LDSwitcher\Wallpapers\" ^| find "\Wallpapers\%mode:~0,1%"') do set WP="%%~fi"
+    )
+
+    REM Generate and apply theme
+    if %taskBarMode%==2 (
+        call :GenerateTheme %mode:~1% %mode:~1% %WP%
+    ) else (
+        call :GenerateTheme %mode:~1% %taskBarMode% %WP%
+    )
+    "%localappdata%\LDSwitcher\ThemeSwitcher.exe" "%localappdata%\Microsoft\Windows\Themes\LDSwitcher.theme"
+
+    REM Call on-change addons
+    call :callOnThemeChangeAddons %mode:~0,1%
+
+goto :loopW11
+
+
+
+:GenerateTheme
+:: Arg1 = App mode (Dark|Light)
+:: Arg2 = System mode (Dark|Light)
+:: Arg3 = Wallpaper within double quotes (if not defined use double double quotes)
+
+:: Detect currently applied theme
+for /f "delims=" %%i in ('reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Themes /v CurrentTheme ^| find "REG_SZ"') do @set CurrentThemeFile=%%i
+set CurrentThemeFile=%CurrentThemeFile:~30%
+
+:: If currently applied theme file does not exist, use default windows theme
+if not exist "%CurrentThemeFile%" set CurrentThemeFile=%windir%\Resources\Themes\aero.theme
+
+:: Detect current accent color
+for /f "delims=x tokens=2" %%i in ('reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent /v AccentColorMenu ^| find "REG_DWORD"') do set CurrentAccent=%%i
+set CurrentAccent=%CurrentAccent:~0,2%%CurrentAccent:~6,2%%CurrentAccent:~4,2%%CurrentAccent:~2,2%
+
+:: Detect current wallpaper path
+set GenThemeWP=%3
+set GenThemeWP=%GenThemeWP:~1,-1%
+
+:: If no wallpaper was set use current wallpaper
+if "%GenThemeWP%" neq "" goto :GenerateThemeSkipWP
+    for /f "delims=" %%i in ('reg query "HKCU\Control Panel\Desktop" /v Wallpaper ^| find "REG_SZ"') do set GenThemeWP=%%i
+    set GenThemeWP=%GenThemeWP:~27%
+:GenerateThemeSkipWP
+
+
+:: Create a modified theme based on current (or default) theme
+for /f "delims=" %%i in ('type "%CurrentThemeFile%"') do (
+    echo %%i | findstr /b "Wallpaper=" > nul && (
+        :: Replace "Wallpaper" line
+        echo Wallpaper=%GenThemeWP%>> "%localappdata%\LDSwitcher\LDSwitcher.theme"
+        findstr /b "PicturePosition=" "%CurrentThemeFile%" > nul || echo PicturePosition=4>> "%localappdata%\LDSwitcher\LDSwitcher.theme"
+    ) || (
+        :: Replace "SystemMode" line
+        echo %%i | findstr /b "SystemMode=" > nul && (
+            echo SystemMode=%2>> "%localappdata%\LDSwitcher\LDSwitcher.theme"
+        ) || (
+            :: Replace "AppMode" line
+            echo %%i | findstr /b "AppMode=" > nul && (
+                echo AppMode=%1>> "%localappdata%\LDSwitcher\LDSwitcher.theme"
+            ) || (
+                :: Replace "ColorizationColor" line
+                echo %%i | findstr /b "ColorizationColor=" > nul && (
+                    echo ColorizationColor=%CurrentAccent%>> "%localappdata%\LDSwitcher\LDSwitcher.theme"
+                ) || (
+                    :: Keep unneded lines intact
+                    echo %%i>> "%localappdata%\LDSwitcher\LDSwitcher.theme"
+                )
+            )
+        )
+    )
+)
+
+:: Move modified theme to user's themes folder
+move /y "%localappdata%\LDSwitcher\LDSwitcher.theme" "%localappdata%\Microsoft\Windows\Themes\LDSwitcher.theme"
+
+:: Clean variables and exit
+set CurrentThemeFile=
+set CurrentAccent=
+set GenThemeWP=
+exit /b
+
 
 :setTheme
 rem Avoid changing windows registry if there is no need
@@ -417,6 +548,7 @@ for /f "delims=x tokens=2" %%i in ('reg query "HKCU\SOFTWARE\Microsoft\Windows\C
 exit /b
 
 :deployWallpaperScript
+if "%WindowsVersion%"=="11" exit /b
 rem Thanks to this guy https://c-nergy.be/blog/?p=15291
 echo param ([string]$Image="") > %1
 echo $code = @' >> %1
@@ -504,6 +636,7 @@ set strOptAlongWindows=Junto al tema de (W)indows
 set strOptPeriodical=(P)eriodicamente
 set strAddonOptions=WP
 set strAddonInstalledOK=Add-On instalado correctamente.
+set strThemeSwitcherMissing=Se necesita ThemeSwitcher.exe para que LDSwitcher funcione en Windows 11.
 exit /b 0
 
 :setLangEn
@@ -549,4 +682,5 @@ set strOptAlongWindows=Alongside (W)indows theme
 set strOptPeriodical=(P)eriodically
 set strAddonOptions=WP
 set strAddonInstalledOK=Add-On installed successfully.
+set strThemeSwitcherMissing=ThemeSwitcher.exe is required for LDSwitcher to work on Windows 11.
 exit /b 0
